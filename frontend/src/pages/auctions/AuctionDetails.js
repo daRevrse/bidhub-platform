@@ -1,8 +1,10 @@
+// frontend/src/pages/auctions/AuctionDetails.js
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import axios from "axios";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import RealTimeBidding from "../../components/auctions/RealTimeBidding";
 
 const AuctionDetails = () => {
   const { id } = useParams();
@@ -10,11 +12,9 @@ const AuctionDetails = () => {
   const navigate = useNavigate();
 
   const [auction, setAuction] = useState(null);
-  const [bidAmount, setBidAmount] = useState("");
   const [loading, setLoading] = useState(true);
-  const [bidding, setBidding] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [currentPrice, setCurrentPrice] = useState(0);
 
   useEffect(() => {
     fetchAuctionDetails();
@@ -27,7 +27,7 @@ const AuctionDetails = () => {
         `http://localhost:5000/api/auctions/${id}`
       );
       setAuction(response.data);
-      setBidAmount((response.data.currentPrice + 1000).toString());
+      setCurrentPrice(response.data.currentPrice);
     } catch (error) {
       console.error("Erreur chargement enchère:", error);
       setError("Enchère non trouvée");
@@ -36,31 +36,15 @@ const AuctionDetails = () => {
     }
   };
 
-  const handleBid = async (e) => {
-    e.preventDefault();
-
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-
-    setBidding(true);
-    setError("");
-    setSuccess("");
-
-    try {
-      await axios.post(`http://localhost:5000/api/auctions/${id}/bid`, {
-        amount: parseFloat(bidAmount),
-      });
-
-      setSuccess("Offre placée avec succès !");
-      await fetchAuctionDetails(); // Rafraîchir les données
-    } catch (error) {
-      setError(
-        error.response?.data?.message || "Erreur lors du placement de l'offre"
-      );
-    } finally {
-      setBidding(false);
+  // Callback pour mettre à jour le prix depuis le composant temps réel
+  const handleBidUpdate = (newPrice) => {
+    if (newPrice === "ended") {
+      setAuction((prev) => (prev ? { ...prev, status: "ended" } : null));
+    } else if (typeof newPrice === "number") {
+      setCurrentPrice(newPrice);
+      if (auction) {
+        setAuction((prev) => ({ ...prev, currentPrice: newPrice }));
+      }
     }
   };
 
@@ -91,12 +75,6 @@ const AuctionDetails = () => {
     );
   };
 
-  const canBid = () => {
-    if (!user || !auction) return false;
-    if (auction.product.sellerId === user.id) return false;
-    return isAuctionActive();
-  };
-
   if (loading) return <LoadingSpinner />;
 
   if (error && !auction) {
@@ -119,7 +97,9 @@ const AuctionDetails = () => {
         {/* Images du produit */}
         <div className="space-y-4">
           <div className="aspect-w-16 aspect-h-12">
-            {auction.product.images && auction.product.images.length > 0 ? (
+            {auction.product.images &&
+            Array.isArray(auction.product.images) &&
+            auction.product.images.length > 0 ? (
               <img
                 src={`http://localhost:5000/uploads/products/${auction.product.images[0]}`}
                 alt={auction.product.title}
@@ -139,21 +119,23 @@ const AuctionDetails = () => {
           </div>
 
           {/* Miniatures (si plusieurs images) */}
-          {auction.product.images && auction.product.images.length > 1 && (
-            <div className="grid grid-cols-4 gap-2">
-              {auction.product.images.slice(1, 5).map((image, index) => (
-                <img
-                  key={index}
-                  src={`http://localhost:5000/uploads/products/${image}`}
-                  alt={`${auction.product.title} ${index + 2}`}
-                  className="w-full h-20 object-cover rounded cursor-pointer hover:opacity-75"
-                  onError={(e) => {
-                    e.target.src = "https://via.placeholder.com/150?text=N/A";
-                  }}
-                />
-              ))}
-            </div>
-          )}
+          {auction.product.images &&
+            Array.isArray(auction.product.images) &&
+            auction.product.images.length > 1 && (
+              <div className="grid grid-cols-4 gap-2">
+                {auction.product.images.slice(1, 5).map((image, index) => (
+                  <img
+                    key={index}
+                    src={`http://localhost:5000/uploads/products/${image}`}
+                    alt={`${auction.product.title} ${index + 2}`}
+                    className="w-full h-20 object-cover rounded cursor-pointer hover:opacity-75"
+                    onError={(e) => {
+                      e.target.src = "https://via.placeholder.com/150?text=N/A";
+                    }}
+                  />
+                ))}
+              </div>
+            )}
         </div>
 
         {/* Détails de l'enchère */}
@@ -181,7 +163,7 @@ const AuctionDetails = () => {
               <div>
                 <p className="text-sm text-gray-500 mb-1">Prix actuel</p>
                 <p className="text-2xl font-bold text-primary-600">
-                  {formatPrice(auction.currentPrice)}
+                  {formatPrice(currentPrice)}
                 </p>
               </div>
             </div>
@@ -200,78 +182,15 @@ const AuctionDetails = () => {
               <div>
                 <p className="text-sm text-gray-500 mb-1">Nombre d'offres</p>
                 <p className="text-lg font-semibold">
-                  {auction.bids ? auction.bids.length : 0}
+                  {auction.bids && Array.isArray(auction.bids)
+                    ? auction.bids.length
+                    : 0}
                 </p>
               </div>
             </div>
 
-            {/* Formulaire d'enchère */}
-            {canBid() && (
-              <form onSubmit={handleBid} className="space-y-4">
-                {error && (
-                  <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                    {error}
-                  </div>
-                )}
-                {success && (
-                  <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-                    {success}
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Votre offre (minimum:{" "}
-                    {formatPrice(auction.currentPrice + 1)})
-                  </label>
-                  <input
-                    type="number"
-                    value={bidAmount}
-                    onChange={(e) => setBidAmount(e.target.value)}
-                    min={auction.currentPrice + 1}
-                    step="100"
-                    className="form-input"
-                    placeholder="Montant en FCFA"
-                    required
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={bidding}
-                  className="w-full bid-button disabled:opacity-50"
-                >
-                  {bidding ? "Placement de l'offre..." : "Placer l'offre"}
-                </button>
-              </form>
-            )}
-
-            {/* Messages pour les cas où on ne peut pas enchérir */}
-            {!user && (
-              <div className="text-center">
-                <p className="text-gray-600 mb-4">
-                  Connectez-vous pour participer à cette enchère
-                </p>
-                <button
-                  onClick={() => navigate("/login")}
-                  className="btn-primary"
-                >
-                  Se connecter
-                </button>
-              </div>
-            )}
-
-            {user && auction.product.sellerId === user.id && (
-              <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
-                C'est votre produit - vous ne pouvez pas enchérir dessus
-              </div>
-            )}
-
-            {!isAuctionActive() && auction.status === "ended" && (
-              <div className="bg-gray-100 border border-gray-400 text-gray-700 px-4 py-3 rounded text-center">
-                Cette enchère est terminée
-              </div>
-            )}
+            {/* Système d'enchères en temps réel */}
+            <RealTimeBidding auction={auction} onBidUpdate={handleBidUpdate} />
           </div>
 
           {/* Informations sur le vendeur */}
@@ -307,58 +226,62 @@ const AuctionDetails = () => {
       </div>
 
       {/* Historique des offres */}
-      {auction.bids && auction.bids.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Historique des offres ({auction.bids.length})
-          </h2>
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="max-h-96 overflow-y-auto">
-              {auction.bids.map((bid, index) => (
-                <div
-                  key={bid.id}
-                  className={`p-4 flex justify-between items-center ${
-                    index !== auction.bids.length - 1
-                      ? "border-b border-gray-200"
-                      : ""
-                  } ${index === 0 ? "bg-green-50" : ""}`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                      <span className="text-xs font-semibold text-gray-600">
-                        {bid.bidder.firstName[0]}
-                        {bid.bidder.lastName[0]}
-                      </span>
+      {auction.bids &&
+        Array.isArray(auction.bids) &&
+        auction.bids.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              Historique des offres ({auction.bids.length})
+            </h2>
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="max-h-96 overflow-y-auto">
+                {auction.bids.map((bid, index) => (
+                  <div
+                    key={bid.id}
+                    className={`p-4 flex justify-between items-center ${
+                      index !== auction.bids.length - 1
+                        ? "border-b border-gray-200"
+                        : ""
+                    } ${index === 0 ? "bg-green-50" : ""}`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-semibold text-gray-600">
+                          {bid.bidder.firstName[0]}
+                          {bid.bidder.lastName[0]}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {bid.bidder.firstName} {bid.bidder.lastName[0]}.
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(bid.timestamp).toLocaleString("fr-FR")}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {bid.bidder.firstName} {bid.bidder.lastName[0]}.
+                    <div className="text-right">
+                      <p
+                        className={`font-bold ${
+                          index === 0
+                            ? "text-green-600 text-lg"
+                            : "text-gray-900"
+                        }`}
+                      >
+                        {formatPrice(bid.amount)}
                       </p>
-                      <p className="text-sm text-gray-500">
-                        {new Date(bid.timestamp).toLocaleString("fr-FR")}
-                      </p>
+                      {index === 0 && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Offre la plus haute
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p
-                      className={`font-bold ${
-                        index === 0 ? "text-green-600 text-lg" : "text-gray-900"
-                      }`}
-                    >
-                      {formatPrice(bid.amount)}
-                    </p>
-                    {index === 0 && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        Offre la plus haute
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Informations supplémentaires */}
       <div className="mt-8 grid md:grid-cols-2 gap-6">

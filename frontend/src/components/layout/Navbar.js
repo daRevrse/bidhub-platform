@@ -29,6 +29,14 @@ const Navbar = () => {
             >
               Enchères
             </Link>
+            {user && (user.role === "seller" || user.role === "admin") && (
+              <Link
+                to="/create-product"
+                className="text-gray-700 hover:text-primary-600 transition-colors"
+              >
+                Vendre
+              </Link>
+            )}
             <Link
               to="/categories"
               className="text-gray-700 hover:text-primary-600 transition-colors"
@@ -48,6 +56,14 @@ const Navbar = () => {
             {user ? (
               <div className="flex items-center space-x-4">
                 <span className="text-gray-700">Bonjour, {user.firstName}</span>
+                {user.role === "admin" && (
+                  <Link
+                    to="/admin"
+                    className="text-red-600 hover:text-red-700 font-medium"
+                  >
+                    Admin
+                  </Link>
+                )}
                 <Link to="/profile" className="btn-secondary">
                   Profil
                 </Link>

@@ -7,6 +7,8 @@ import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import AuctionList from "./pages/auctions/AuctionList";
 import AuctionDetails from "./pages/auctions/AuctionDetails";
+import CreateProduct from "./pages/products/CreateProduct";
+import AdminDashboard from "./pages/admin/Dashboard";
 import Profile from "./pages/user/Profile";
 import { AuthProvider } from "./contexts/AuthContext";
 
@@ -23,6 +25,8 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/auctions" element={<AuctionList />} />
               <Route path="/auction/:id" element={<AuctionDetails />} />
+              <Route path="/create-product" element={<CreateProduct />} />
+              <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/profile" element={<Profile />} />
             </Routes>
           </main>

@@ -30,8 +30,7 @@ const AuctionCard = ({ auction, timeRemaining }) => {
               alt={auction.product.title}
               className="w-full h-48 object-cover rounded-lg"
               onError={(e) => {
-                e.target.src =
-                  "https://via.placeholder.com/300x200?text=Image+non+disponible";
+                e.target.src = "https://placehold.net/1.png";
               }}
             />
           ) : (

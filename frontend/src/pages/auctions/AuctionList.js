@@ -28,6 +28,8 @@ const AuctionList = () => {
 
       setAuctions(response.data.auctions);
       setTotalPages(response.data.totalPages);
+
+      console.log("response", response);
     } catch (error) {
       console.error("Erreur chargement enchères:", error);
     } finally {
