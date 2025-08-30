@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSocket } from "../../hooks/useSocket";
 import { useAuth } from "../../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const RealTimeBidding = ({ auction, onBidUpdate }) => {
   const { user } = useAuth();
@@ -13,6 +14,7 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [isEnding, setIsEnding] = useState(false);
   const [message, setMessage] = useState("");
+  const navigate = useNavigate();
 
   // Calculer le temps restant
   useEffect(() => {
@@ -371,6 +373,20 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
           <p className="text-gray-700 font-medium">
             Cette enchère est terminée
           </p>
+        </div>
+      )}
+
+      {user && auction.winnerId === user.id && auction.status === "ended" && (
+        <div className="bg-green-50 border border-green-200 p-4 rounded-lg text-center">
+          <p className="text-green-700 font-medium mb-3">
+            🎉 Félicitations ! Vous avez remporté cette enchère
+          </p>
+          <button
+            onClick={() => navigate(`/payment/${auction.id}`)}
+            className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg"
+          >
+            💳 Finaliser le paiement
+          </button>
         </div>
       )}
     </div>

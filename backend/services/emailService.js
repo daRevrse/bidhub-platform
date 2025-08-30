@@ -3,16 +3,6 @@ const nodemailer = require("nodemailer");
 require("dotenv").config();
 
 class EmailService {
-  //   constructor() {
-  //     // Configuration pour un service d'email (exemple avec Gmail)
-  //     this.transporter = nodemailer.createTransporter({
-  //       service: "gmail",
-  //       auth: {
-  //         user: process.env.EMAIL_USER,
-  //         pass: process.env.EMAIL_PASS, // Mot de passe d'application Gmail
-  //       },
-  //     });
-
   constructor() {
     this.transporter = nodemailer.createTransport({
       service: "gmail",
@@ -35,25 +25,6 @@ class EmailService {
     });
     */
   }
-
-  //   async sendEmail(to, subject, htmlContent, textContent = "") {
-  //     try {
-  //       const mailOptions = {
-  //         from: `"BidHub Togo" <${process.env.EMAIL_USER}>`,
-  //         to: to,
-  //         subject: subject,
-  //         text: textContent,
-  //         html: htmlContent,
-  //       };
-
-  //       const result = await this.transporter.sendMail(mailOptions);
-  //       console.log(`✅ Email sent to ${to}: ${subject}`);
-  //       return result;
-  //     } catch (error) {
-  //       console.error(`❌ Failed to send email to ${to}:`, error);
-  //       throw error;
-  //     }
-  //   }
 
   async sendEmail(to, subject, htmlContent, textContent = "") {
     try {
@@ -369,6 +340,86 @@ class EmailService {
 
       await this.sendEmail(participant.email, subject, html);
     }
+  }
+
+  // Template pour confirmation de paiement (acheteur)
+  async sendPaymentConfirmationToBuyer(buyer, auction, payment) {
+    const subject = `✅ Paiement confirmé - "${auction.product.title}"`;
+
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
+        <h1 style="margin: 0; font-size: 24px;">✅ Paiement confirmé !</h1>
+        <p style="margin: 10px 0 0 0; opacity: 0.9;">Votre achat est finalisé</p>
+      </div>
+      
+      <div style="background: #f9f9f9; padding: 20px; border-radius: 0 0 10px 10px; border: 1px solid #ddd;">
+        <h2 style="color: #17a2b8; margin-top: 0;">Bonjour ${
+          seller.firstName
+        },</h2>
+        
+        <p>Excellente nouvelle ! L'acheteur a finalisé son paiement pour votre produit.</p>
+        
+        <div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745; margin: 20px 0;">
+          <h3 style="margin: 0 0 10px 0; color: #333;">${
+            auction.product.title
+          }</h3>
+          <p style="margin: 5px 0;"><strong>Montant reçu :</strong> ${this.formatPrice(
+            payment.amount * 0.95
+          )} <span style="color: #666;">(après commission 5%)</span></p>
+          <p style="margin: 5px 0;"><strong>Commission BidHub :</strong> ${this.formatPrice(
+            payment.amount * 0.05
+          )}</p>
+          <p style="margin: 5px 0;"><strong>Paiement via :</strong> ${
+            payment.provider === "flooz" ? "Flooz" : "T-Money"
+          }</p>
+        </div>
+
+        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h4 style="margin: 0 0 10px 0; color: #1976d2;">👤 Informations acheteur</h4>
+          <p style="margin: 5px 0;"><strong>Nom :</strong> ${buyer.firstName} ${
+      buyer.lastName
+    }</p>
+          <p style="margin: 5px 0;"><strong>Email :</strong> ${buyer.email}</p>
+          <p style="margin: 5px 0;"><strong>Téléphone :</strong> ${
+            buyer.phone
+          }</p>
+        </div>
+
+        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107; margin: 20px 0;">
+          <h4 style="margin: 0 0 10px 0; color: #856404;">📋 À faire maintenant</h4>
+          <ol style="margin: 0; padding-left: 20px;">
+            <li><strong>Contactez l'acheteur</strong> dans les 24h</li>
+            <li><strong>Organisez la livraison</strong> ou le point de rencontre</li>
+            <li><strong>Préparez le produit</strong> pour la remise</li>
+            <li><strong>Confirmez la livraison</strong> sur BidHub</li>
+          </ol>
+        </div>
+
+        <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h4 style="margin: 0 0 10px 0; color: #155724;">💳 Paiement vendeur</h4>
+          <p style="margin: 5px 0;">Votre paiement sera libéré après confirmation de livraison par l'acheteur.</p>
+          <p style="margin: 5px 0; font-size: 14px; color: #666;">Délai habituel : 24-48h après livraison</p>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.CLIENT_URL}/profile" 
+             style="background: #17a2b8; color: white; text-decoration: none; padding: 12px 25px; border-radius: 25px; font-weight: bold; display: inline-block; margin-right: 10px;">
+            Voir mes ventes
+          </a>
+          <a href="mailto:${buyer.email}" 
+             style="background: #28a745; color: white; text-decoration: none; padding: 12px 25px; border-radius: 25px; font-weight: bold; display: inline-block;">
+            Contacter l'acheteur
+          </a>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+    return await this.sendEmail(seller.email, subject, html);
   }
 
   formatPrice(price) {

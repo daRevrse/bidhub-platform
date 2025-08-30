@@ -1,4 +1,4 @@
-const { User, Product, Auction, Bid } = require("../models");
+const { User, Product, Auction, Bid, Payment } = require("../models");
 const bcrypt = require("bcryptjs");
 
 const seedDatabase = async () => {
@@ -120,6 +120,35 @@ const seedDatabase = async () => {
         amount: 75000,
       },
     ]);
+
+    // Créer quelques paiements de test
+    await Payment.bulkCreate([
+      {
+        transactionId: "BH_TEST_001",
+        auctionId: auctions[0].id,
+        userId: users[2].id,
+        amount: 250000,
+        provider: "flooz",
+        phoneNumber: "22890222222",
+        status: "completed",
+        fees: 6250,
+        completedAt: new Date(),
+        metadata: { test: true },
+      },
+      {
+        transactionId: "BH_TEST_002",
+        auctionId: auctions[2].id,
+        userId: users[2].id,
+        amount: 75000,
+        provider: "tmoney",
+        phoneNumber: "22870111111",
+        status: "pending",
+        fees: 1500,
+        metadata: { test: true },
+      },
+    ]);
+
+    console.log("✅ Test payments created");
 
     console.log("✅ Seeding terminé avec succès");
     console.log("📧 Comptes de test créés:");

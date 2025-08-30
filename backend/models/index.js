@@ -19,6 +19,7 @@ const User = require("./User")(sequelize);
 const Product = require("./Product")(sequelize);
 const Auction = require("./Auction")(sequelize);
 const Bid = require("./Bid")(sequelize);
+const Payment = require("./Payment")(sequelize);
 
 // Relations entre les modèles
 User.hasMany(Product, { foreignKey: "sellerId", as: "products" });
@@ -33,10 +34,17 @@ Bid.belongsTo(Auction, { foreignKey: "auctionId", as: "auction" });
 User.hasMany(Bid, { foreignKey: "bidderId", as: "bids" });
 Bid.belongsTo(User, { foreignKey: "bidderId", as: "bidder" });
 
+User.hasMany(Payment, { foreignKey: "userId", as: "payments" });
+Payment.belongsTo(User, { foreignKey: "userId", as: "user" });
+
+Auction.hasMany(Payment, { foreignKey: "auctionId", as: "payments" });
+Payment.belongsTo(Auction, { foreignKey: "auctionId", as: "auction" });
+
 module.exports = {
   sequelize,
   User,
   Product,
   Auction,
   Bid,
+  Payment,
 };

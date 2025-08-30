@@ -11,6 +11,8 @@ import CreateProduct from "./pages/products/CreateProduct";
 import AdminDashboard from "./pages/admin/Dashboard";
 import Profile from "./pages/user/Profile";
 import { AuthProvider } from "./contexts/AuthContext";
+import PaymentPage from "./pages/payment/PaymentPage";
+import PaymentStatus from "./pages/payment/PaymentStatus";
 
 function App() {
   return (
@@ -28,6 +30,11 @@ function App() {
               <Route path="/create-product" element={<CreateProduct />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/payment/:auctionId" element={<PaymentPage />} />
+              <Route
+                path="/payment/:paymentId/status"
+                element={<PaymentStatus />}
+              />
             </Routes>
           </main>
           <Footer />

@@ -32,6 +32,7 @@ app.use("/api/products", require("./routes/products"));
 app.use("/api/auctions", require("./routes/auctions"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/admin", require("./routes/admin"));
+app.use("/api/payments", require("./routes/payments"));
 
 // Route de test
 app.get("/", (req, res) => {
