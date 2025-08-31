@@ -6,6 +6,7 @@ const { Server } = require("socket.io");
 const { sequelize } = require("./models");
 const AuctionSocketManager = require("./socket/auctionSocket");
 const CronJobService = require("./services/cronJobs");
+const MessageSocketManager = require("./socket/messageSocket");
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static("uploads"));
+app.use("/uploads/messages", express.static("uploads/messages"));
 
 // Routes
 app.use("/api/auth", require("./routes/auth"));
@@ -33,6 +35,8 @@ app.use("/api/auctions", require("./routes/auctions"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/admin", require("./routes/admin"));
 app.use("/api/payments", require("./routes/payments"));
+app.use("/api/reviews", require("./routes/reviews"));
+app.use("/api/messages", require("./routes/messages"));
 
 // Route de test
 app.get("/", (req, res) => {
@@ -45,6 +49,12 @@ app.get("/", (req, res) => {
 
 // Initialiser le gestionnaire de sockets
 const auctionSocketManager = new AuctionSocketManager(io);
+const messageSocketManager = new MessageSocketManager(io);
+
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 
 // Initialiser les tâches automatisées
 let cronJobService;

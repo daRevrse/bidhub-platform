@@ -5,6 +5,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import axios from "axios";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import RealTimeBidding from "../../components/auctions/RealTimeBidding";
+import ContactSellerButton from "../../components/messaging/ContactSellerButton";
 
 const AuctionDetails = () => {
   const { id } = useParams();
@@ -214,6 +215,12 @@ const AuctionDetails = () => {
           </div>
         </div>
       </div>
+
+      {user && user.id !== auction.product.seller.id && (
+        <div className="mt-4">
+          <ContactSellerButton auction={auction} />
+        </div>
+      )}
 
       {/* Description du produit */}
       <div className="mt-8">

@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import MessageNotification from "../messaging/MessageNotification";
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -49,12 +50,19 @@ const Navbar = () => {
             >
               Comment ça marche
             </Link>
+            <Link
+              to="/reviews"
+              className="text-gray-700 hover:text-primary-600 transition-colors"
+            >
+              Avis
+            </Link>
           </div>
 
           {/* User Actions */}
           <div className="flex items-center space-x-4">
             {user ? (
               <div className="flex items-center space-x-4">
+                <MessageNotification />
                 <span className="text-gray-700">Bonjour, {user.firstName}</span>
                 {user.role === "admin" && (
                   <Link

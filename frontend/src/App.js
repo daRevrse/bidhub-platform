@@ -13,6 +13,9 @@ import Profile from "./pages/user/Profile";
 import { AuthProvider } from "./contexts/AuthContext";
 import PaymentPage from "./pages/payment/PaymentPage";
 import PaymentStatus from "./pages/payment/PaymentStatus";
+import ReviewsPage from "./pages/reviews/ReviewsPage";
+import UserProfile from "./pages/users/UserProfile";
+import MessagesPage from "./pages/messages/MessagesPage";
 
 function App() {
   return (
@@ -35,6 +38,9 @@ function App() {
                 path="/payment/:paymentId/status"
                 element={<PaymentStatus />}
               />
+              <Route path="/reviews" element={<ReviewsPage />} />
+              <Route path="/user/:userId" element={<UserProfile />} />
+              <Route path="/messages" element={<MessagesPage />} />
             </Routes>
           </main>
           <Footer />
