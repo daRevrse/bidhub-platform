@@ -1,58 +1,78 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { useSocket } from "../../hooks/useSocket";
+import { BellIcon, ChatBubbleLeftRightIcon } from "@heroicons/react/24/outline";
+import { BellIcon as BellSolidIcon } from "@heroicons/react/24/solid";
 import axios from "axios";
 
 const MessageNotification = () => {
   const { user } = useAuth();
-  const socket = useSocket();
   const [unreadCount, setUnreadCount] = useState(0);
-  const [showDropdown, setShowDropdown] = useState(false);
   const [recentMessages, setRecentMessages] = useState([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
-      fetchUnreadCount();
-      fetchRecentMessages();
+      fetchUnreadMessages();
+      // Actualiser les messages toutes les 30 secondes
+      const interval = setInterval(fetchUnreadMessages, 30000);
+      return () => clearInterval(interval);
     }
   }, [user]);
 
-  useEffect(() => {
-    if (socket && user) {
-      socket.on("new_message", () => {
-        fetchUnreadCount();
-        fetchRecentMessages();
-      });
-
-      return () => {
-        socket.off("new_message");
-      };
-    }
-  }, [socket, user]);
-
-  const fetchUnreadCount = async () => {
+  const fetchUnreadMessages = async () => {
     try {
       const response = await axios.get(
-        "http://localhost:5000/api/messages/unread-count"
+        "http://localhost:5000/api/messages/unread"
       );
-      setUnreadCount(response.data.unreadCount);
+      setUnreadCount(response.data.unreadCount || 0);
+      setRecentMessages(response.data.recentMessages || []);
     } catch (error) {
-      console.error("Erreur comptage messages non lus:", error);
+      console.error("Erreur récupération messages:", error);
     }
   };
 
-  const fetchRecentMessages = async () => {
+  const loadRecentMessages = async () => {
+    if (loading) return;
+
+    setLoading(true);
     try {
       const response = await axios.get(
-        "http://localhost:5000/api/messages/conversations?limit=5"
+        "http://localhost:5000/api/messages/recent?limit=5"
       );
-      setRecentMessages(
-        response.data.conversations.filter((conv) => conv.unreadCount > 0)
-      );
+      setRecentMessages(response.data.messages || []);
     } catch (error) {
       console.error("Erreur récupération messages récents:", error);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleToggleDropdown = () => {
+    if (!isOpen && recentMessages.length === 0) {
+      loadRecentMessages();
+    }
+    setIsOpen(!isOpen);
+  };
+
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now - date;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return "À l'instant";
+    if (minutes < 60) return `${minutes}m`;
+    if (hours < 24) return `${hours}h`;
+    return `${days}j`;
+  };
+
+  const truncateMessage = (message, maxLength = 50) => {
+    if (message.length <= maxLength) return message;
+    return message.substring(0, maxLength) + "...";
   };
 
   if (!user) return null;
@@ -60,102 +80,123 @@ const MessageNotification = () => {
   return (
     <div className="relative">
       <button
-        onClick={() => setShowDropdown(!showDropdown)}
-        className="relative p-2 text-gray-600 hover:text-gray-800 focus:outline-none"
+        onClick={handleToggleDropdown}
+        className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 group"
       >
-        <span className="text-xl">💬</span>
+        {unreadCount > 0 ? (
+          <BellSolidIcon className="w-6 h-6 text-blue-600" />
+        ) : (
+          <BellIcon className="w-6 h-6 text-gray-600 group-hover:text-blue-600" />
+        )}
+
+        {/* Badge de notification */}
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-            {unreadCount > 9 ? "9+" : unreadCount}
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-medium animate-pulse">
+            {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
       </button>
 
-      {showDropdown && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex justify-between items-center">
-              <h3 className="font-medium text-gray-900">Messages</h3>
-              <Link
-                to="/messages"
-                className="text-primary-600 hover:text-primary-700 text-sm"
-                onClick={() => setShowDropdown(false)}
-              >
-                Voir tous
-              </Link>
+      {/* Dropdown des messages */}
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50 max-h-96 overflow-hidden">
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-gray-900 flex items-center">
+                <ChatBubbleLeftRightIcon className="w-5 h-5 mr-2 text-blue-600" />
+                Messages
+              </h3>
+              {unreadCount > 0 && (
+                <span className="text-xs text-blue-600 font-medium">
+                  {unreadCount} non lu{unreadCount > 1 ? "s" : ""}
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="max-h-80 overflow-y-auto">
-            {recentMessages.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">
-                <div className="text-2xl mb-2">📭</div>
-                <p className="text-sm">Aucun nouveau message</p>
+          {/* Liste des messages */}
+          <div className="max-h-72 overflow-y-auto">
+            {loading ? (
+              <div className="p-4 text-center">
+                <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                <p className="text-sm text-gray-500">Chargement...</p>
               </div>
-            ) : (
-              recentMessages.map((conv) => (
+            ) : recentMessages.length > 0 ? (
+              recentMessages.map((message) => (
                 <Link
-                  key={conv.id}
-                  to={`/messages?conversation=${conv.id}`}
-                  onClick={() => setShowDropdown(false)}
-                  className="block p-4 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                  key={message.id}
+                  to={`/messages?conversation=${
+                    message.conversationId || message.senderId
+                  }`}
+                  className="block px-4 py-3 hover:bg-gray-50 transition-colors duration-200 border-b border-gray-100 last:border-b-0"
+                  onClick={() => setIsOpen(false)}
                 >
                   <div className="flex items-start space-x-3">
-                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-sm font-semibold text-gray-600">
-                        {conv.otherParticipant.firstName[0]}
-                        {conv.otherParticipant.lastName[0]}
-                      </span>
+                    {/* Avatar */}
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+                        <span className="text-white font-medium text-sm">
+                          {message.sender?.firstName?.[0] ||
+                            message.senderName?.[0] ||
+                            "?"}
+                        </span>
+                      </div>
                     </div>
 
+                    {/* Contenu du message */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start">
-                        <p className="font-medium text-gray-900 truncate">
-                          {conv.otherParticipant.firstName}{" "}
-                          {conv.otherParticipant.lastName}
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {message.sender?.firstName} {message.sender?.lastName}
+                          {!message.sender && message.senderName}
                         </p>
-                        {conv.unreadCount > 0 && (
-                          <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full ml-2">
-                            {conv.unreadCount}
-                          </span>
-                        )}
+                        <span className="text-xs text-gray-500 flex-shrink-0">
+                          {formatTime(message.createdAt)}
+                        </span>
                       </div>
-
-                      {conv.lastMessagePreview && (
-                        <p className="text-sm text-gray-600 truncate">
-                          {conv.lastMessagePreview}
-                        </p>
-                      )}
-
-                      {conv.lastMessageAt && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {new Date(conv.lastMessageAt).toLocaleString("fr-FR")}
-                        </p>
+                      <p className="text-sm text-gray-600 line-clamp-2">
+                        {truncateMessage(message.content || message.text)}
+                      </p>
+                      {!message.isRead && (
+                        <div className="mt-1">
+                          <span className="inline-block w-2 h-2 bg-blue-600 rounded-full"></span>
+                        </div>
                       )}
                     </div>
                   </div>
                 </Link>
               ))
+            ) : (
+              <div className="p-8 text-center">
+                <ChatBubbleLeftRightIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm text-gray-500 mb-2">Aucun message</p>
+                <p className="text-xs text-gray-400">
+                  Vos conversations apparaîtront ici
+                </p>
+              </div>
             )}
           </div>
 
-          <div className="p-4 border-t border-gray-200">
+          {/* Footer */}
+          <div className="border-t border-gray-100 bg-gray-50 rounded-b-xl">
             <Link
               to="/messages"
-              onClick={() => setShowDropdown(false)}
-              className="block w-full text-center bg-primary-600 hover:bg-primary-700 text-white py-2 px-4 rounded-lg text-sm font-medium"
+              onClick={() => setIsOpen(false)}
+              className="block w-full text-center py-3 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-gray-100 transition-colors duration-200"
             >
-              Ouvrir la messagerie
+              Voir tous les messages
             </Link>
           </div>
         </div>
       )}
 
-      {showDropdown && (
+      {/* Overlay pour fermer le dropdown */}
+      {isOpen && (
         <div
-          className="fixed inset-0 z-40"
-          onClick={() => setShowDropdown(false)}
-        ></div>
+          className="fixed inset-0 z-40 bg-transparent"
+          onClick={() => setIsOpen(false)}
+        />
       )}
     </div>
   );
