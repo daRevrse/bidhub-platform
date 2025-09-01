@@ -146,11 +146,25 @@ const Navbar = () => {
                       onClick={toggleProfileMenu}
                       className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
                     >
-                      <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-                        <span className="text-white font-semibold text-sm">
-                          {user.firstName[0]}
-                          {user.lastName[0]}
-                        </span>
+                      <div
+                        className={
+                          user.avatar
+                            ? "w-8 h-8 rounded-full flex items-center justify-center"
+                            : "w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center"
+                        }
+                      >
+                        {user.avatar ? (
+                          <img
+                            src={`http://localhost:5000${user.avatar}`}
+                            alt="Avatar"
+                            className="w-full h-full rounded-full"
+                          />
+                        ) : (
+                          <span className="text-white font-semibold text-sm">
+                            {user.firstName[0]}
+                            {user.lastName[0]}
+                          </span>
+                        )}
                       </div>
                       <div className="hidden md:block text-left">
                         <div className="text-sm font-medium text-gray-900">

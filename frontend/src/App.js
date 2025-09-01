@@ -36,6 +36,13 @@ function App() {
               <Route path="/user/:userId" element={<UserProfile />} />
               <Route path="/reviews" element={<ReviewsPage />} />
 
+              {/* Pages d'information */}
+              <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+
               {/* Routes d'authentification (accessibles seulement si non connecté) */}
               <Route
                 path="/login"
@@ -88,14 +95,6 @@ function App() {
                 }
               />
               <Route
-                path="/admin"
-                element={
-                  <PrivateRoute roles={["admin"]}>
-                    <AdminDashboard />
-                  </PrivateRoute>
-                }
-              />
-              <Route
                 path="/payment/:auctionId"
                 element={
                   <PrivateRoute>
@@ -120,6 +119,56 @@ function App() {
                 }
               />
 
+              {/* Routes d'administration (admin seulement) */}
+              <Route
+                path="/admin"
+                element={
+                  <PrivateRoute roles={["admin"]}>
+                    <AdminDashboard />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/admin/dashboard"
+                element={
+                  <PrivateRoute roles={["admin"]}>
+                    <AdminDashboard />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <PrivateRoute roles={["admin"]}>
+                    <UserManagement />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/admin/auctions"
+                element={
+                  <PrivateRoute roles={["admin"]}>
+                    <AuctionManagement />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/admin/reports"
+                element={
+                  <PrivateRoute roles={["admin"]}>
+                    <Reports />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/admin/settings"
+                element={
+                  <PrivateRoute roles={["admin"]}>
+                    <AdminSettings />
+                  </PrivateRoute>
+                }
+              />
+
               {/* Route 404 */}
               <Route path="*" element={<NotFound />} />
             </Routes>
@@ -131,25 +180,143 @@ function App() {
   );
 }
 
+// Composants de pages temporaires (à créer)
+const HowItWorks = () => (
+  <div className="max-w-4xl mx-auto px-4 py-12">
+    <h1 className="text-3xl font-bold text-gray-900 mb-8">Comment ça marche</h1>
+    <div className="prose max-w-none">
+      <p>Guide d'utilisation de BidHub...</p>
+    </div>
+  </div>
+);
+
+const About = () => (
+  <div className="max-w-4xl mx-auto px-4 py-12">
+    <h1 className="text-3xl font-bold text-gray-900 mb-8">
+      À propos de BidHub
+    </h1>
+    <div className="prose max-w-none">
+      <p>BidHub est la première plateforme d'enchères en ligne au Togo...</p>
+    </div>
+  </div>
+);
+
+const Contact = () => (
+  <div className="max-w-4xl mx-auto px-4 py-12">
+    <h1 className="text-3xl font-bold text-gray-900 mb-8">Contactez-nous</h1>
+    <div className="grid md:grid-cols-2 gap-8">
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Informations de contact</h2>
+        <div className="space-y-3">
+          <p>📧 contact@bidhub.tg</p>
+          <p>📞 +228 90 00 00 00</p>
+          <p>📍 Lomé, Togo</p>
+        </div>
+      </div>
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Formulaire de contact</h2>
+        <form className="space-y-4">
+          <input
+            type="text"
+            placeholder="Votre nom"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <input
+            type="email"
+            placeholder="Votre email"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <textarea
+            placeholder="Votre message"
+            rows="4"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          ></textarea>
+          <button
+            type="submit"
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Envoyer
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+);
+
+const Terms = () => (
+  <div className="max-w-4xl mx-auto px-4 py-12">
+    <h1 className="text-3xl font-bold text-gray-900 mb-8">
+      Conditions d'utilisation
+    </h1>
+    <div className="prose max-w-none">
+      <p>Conditions d'utilisation de BidHub...</p>
+    </div>
+  </div>
+);
+
+const Privacy = () => (
+  <div className="max-w-4xl mx-auto px-4 py-12">
+    <h1 className="text-3xl font-bold text-gray-900 mb-8">
+      Politique de confidentialité
+    </h1>
+    <div className="prose max-w-none">
+      <p>Politique de confidentialité de BidHub...</p>
+    </div>
+  </div>
+);
+
+// Composants d'administration temporaires
+const UserManagement = () => (
+  <div className="max-w-7xl mx-auto px-4 py-8">
+    <h1 className="text-3xl font-bold text-gray-900 mb-8">
+      Gestion des utilisateurs
+    </h1>
+    <div className="bg-white rounded-lg shadow p-6">
+      <p>Interface de gestion des utilisateurs à venir...</p>
+    </div>
+  </div>
+);
+
+const AuctionManagement = () => (
+  <div className="max-w-7xl mx-auto px-4 py-8">
+    <h1 className="text-3xl font-bold text-gray-900 mb-8">
+      Gestion des enchères
+    </h1>
+    <div className="bg-white rounded-lg shadow p-6">
+      <p>Interface de gestion des enchères à venir...</p>
+    </div>
+  </div>
+);
+
+const Reports = () => (
+  <div className="max-w-7xl mx-auto px-4 py-8">
+    <h1 className="text-3xl font-bold text-gray-900 mb-8">
+      Rapports et analyses
+    </h1>
+    <div className="bg-white rounded-lg shadow p-6">
+      <p>Interface de rapports à venir...</p>
+    </div>
+  </div>
+);
+
+const AdminSettings = () => (
+  <div className="max-w-7xl mx-auto px-4 py-8">
+    <h1 className="text-3xl font-bold text-gray-900 mb-8">
+      Paramètres administrateur
+    </h1>
+    <div className="bg-white rounded-lg shadow p-6">
+      <p>Interface de paramètres à venir...</p>
+    </div>
+  </div>
+);
+
 // Composant pour la page 404
 const NotFound = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full text-center">
         <div className="mx-auto h-24 w-24 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg mb-8">
-          <svg
-            className="h-12 w-12 text-white"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 20.5a7.962 7.962 0 01-5.207-1.021C6.276 19.002 6.1 18.752 6 18.5v-2.25C6 15.56 6.44 15.12 7.125 15.12c1.072 0 1.875.832 1.875 1.875S8.197 18.87 7.125 18.87c-.685 0-1.125-.44-1.125-.995V16.5"
-            />
-          </svg>
+          <span className="text-4xl">🤔</span>
         </div>
         <h1 className="text-4xl font-bold text-gray-900 mb-4">404</h1>
         <h2 className="text-2xl font-semibold text-gray-700 mb-6">

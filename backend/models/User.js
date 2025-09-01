@@ -96,6 +96,42 @@ module.exports = (sequelize) => {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
       },
+      verificationRequested: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
+      verificationRequestedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      verificationApprovedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      verificationApprovedBy: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: "users",
+          key: "id",
+        },
+      },
+      verificationRejectedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      verificationRejectedBy: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: "users",
+          key: "id",
+        },
+      },
+      verificationRejectionReason: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
     },
     {
       tableName: "users",
@@ -110,6 +146,12 @@ module.exports = (sequelize) => {
         },
         {
           fields: ["verificationToken"],
+        },
+        {
+          fields: ["verificationRequested"],
+        },
+        {
+          fields: ["isVerified"],
         },
       ],
     }

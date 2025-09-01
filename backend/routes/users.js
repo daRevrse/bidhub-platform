@@ -73,27 +73,32 @@ router.get("/public/:userId", async (req, res) => {
         "createdAt",
         "isVerified",
       ],
-      include: [
-        {
-          model: Product,
-          as: "products",
-          where: { status: "active" },
-          required: false,
-          limit: 6,
-          order: [["createdAt", "DESC"]],
-          include: [
-            {
-              model: Auction,
-              as: "auction",
-              attributes: ["id", "currentPrice", "status", "endDate"],
-            },
-          ],
-        },
-      ],
     });
 
     if (!user) {
       return res.status(404).json({ message: "Utilisateur non trouvé" });
+    }
+
+    // Récupérer les produits actifs séparément pour éviter les erreurs d'association
+    let products = [];
+    try {
+      const productsResult = await Product.findAll({
+        where: { sellerId: userId, status: "active" },
+        limit: 6,
+        order: [["createdAt", "DESC"]],
+        include: [
+          {
+            model: Auction,
+            as: "auction",
+            attributes: ["id", "currentPrice", "status", "endDate"],
+            required: false,
+          },
+        ],
+      });
+      products = productsResult || [];
+    } catch (productError) {
+      console.warn("Erreur récupération produits:", productError);
+      // Continue sans les produits si erreur
     }
 
     // Calculer les statistiques de l'utilisateur
@@ -101,52 +106,49 @@ router.get("/public/:userId", async (req, res) => {
       // Nombre total de produits vendus
       Product.count({
         where: { sellerId: userId, status: "sold" },
-      }),
+      }).catch(() => 0),
 
       // Nombre de produits actifs
       Product.count({
         where: { sellerId: userId, status: "active" },
-      }),
+      }).catch(() => 0),
 
-      // Nombre d'enchères remportées (en tant qu'acheteur)
-      Auction.count({
-        include: [
-          {
-            model: Bid,
-            as: "bids",
-            where: { userId: userId },
-            attributes: [],
-          },
-        ],
-        where: {
-          status: "ended",
-          winnerId: userId,
-        },
-      }),
+      // Nombre d'enchères remportées (approximatif)
+      Bid.count({
+        where: { userId: userId },
+      }).catch(() => 0),
 
-      // Note moyenne des avis reçus
-      Review.findOne({
-        attributes: [
-          [
-            Review.sequelize.fn("AVG", Review.sequelize.col("rating")),
-            "averageRating",
-          ],
-          [
-            Review.sequelize.fn("COUNT", Review.sequelize.col("id")),
-            "totalReviews",
-          ],
-        ],
-        where: { revieweeId: userId },
-        raw: true,
-      }),
+      // Note moyenne des avis reçus (si le modèle Review existe)
+      (async () => {
+        try {
+          const reviewResult = await Review.findOne({
+            attributes: [
+              [
+                Review.sequelize.fn("AVG", Review.sequelize.col("rating")),
+                "averageRating",
+              ],
+              [
+                Review.sequelize.fn("COUNT", Review.sequelize.col("id")),
+                "totalReviews",
+              ],
+            ],
+            where: { revieweeId: userId },
+            raw: true,
+          });
+          return reviewResult;
+        } catch (error) {
+          return { averageRating: 0, totalReviews: 0 };
+        }
+      })(),
     ]);
 
     const userProfile = {
       ...user.toJSON(),
+      products: products,
       stats: {
-        productsSold: stats[0],
-        productsActive: stats[1],
-        auctionsWon: stats[2],
+        productsSold: stats[0] || 0,
+        productsActive: stats[1] || 0,
+        auctionsParticipated: stats[2] || 0,
         averageRating: parseFloat(stats[3]?.averageRating || 0).toFixed(1),
         totalReviews: parseInt(stats[3]?.totalReviews || 0),
       },
@@ -155,7 +157,10 @@ router.get("/public/:userId", async (req, res) => {
     res.json(userProfile);
   } catch (error) {
     console.error("Erreur récupération profil public:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    res.status(500).json({
+      message: "Erreur serveur",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 });
 
@@ -309,13 +314,159 @@ router.get("/:userId/reviews", async (req, res) => {
 // @access  Private
 router.post("/upload-avatar", auth, async (req, res) => {
   try {
-    // Cette route nécessiterait l'ajout de multer pour la gestion des fichiers
-    // Pour l'instant, on retourne une erreur appropriée
-    res.status(501).json({
-      message: "Upload d'avatar non implémenté. Veuillez configurer multer.",
+    const multer = require("multer");
+    const path = require("path");
+    const fs = require("fs");
+
+    // Configuration de multer
+    const storage = multer.diskStorage({
+      destination: function (req, file, cb) {
+        const uploadPath = path.join(__dirname, "../uploads/avatars");
+        if (!fs.existsSync(uploadPath)) {
+          fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+      },
+      filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(
+          null,
+          `avatar-${req.user.userId}-${uniqueSuffix}${path.extname(
+            file.originalname
+          )}`
+        );
+      },
+    });
+
+    const fileFilter = (req, file, cb) => {
+      if (file.mimetype.startsWith("image/")) {
+        cb(null, true);
+      } else {
+        cb(new Error("Seules les images sont autorisées"), false);
+      }
+    };
+
+    const upload = multer({
+      storage: storage,
+      fileFilter: fileFilter,
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    }).single("avatar");
+
+    upload(req, res, async function (err) {
+      if (err) {
+        return res.status(400).json({ message: err.message });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "Aucun fichier fourni" });
+      }
+
+      try {
+        const user = await User.findByPk(req.user.userId);
+        if (!user) {
+          return res.status(404).json({ message: "Utilisateur non trouvé" });
+        }
+
+        // Supprimer l'ancien avatar s'il existe
+        if (user.avatar) {
+          const oldAvatarPath = path.join(
+            __dirname,
+            "../uploads/avatars",
+            path.basename(user.avatar)
+          );
+          if (fs.existsSync(oldAvatarPath)) {
+            fs.unlinkSync(oldAvatarPath);
+          }
+        }
+
+        // Mettre à jour l'URL de l'avatar
+        const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+        await user.update({ avatar: avatarUrl });
+
+        res.json({
+          message: "Avatar mis à jour avec succès",
+          avatarUrl: avatarUrl,
+        });
+      } catch (error) {
+        console.error("Erreur sauvegarde avatar:", error);
+        res.status(500).json({ message: "Erreur lors de la sauvegarde" });
+      }
     });
   } catch (error) {
     console.error("Erreur upload avatar:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
+// @route   DELETE /api/users/remove-avatar
+// @desc    Supprimer l'avatar utilisateur
+// @access  Private
+router.delete("/remove-avatar", auth, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
+    }
+
+    // Supprimer le fichier physique
+    if (user.avatar) {
+      const fs = require("fs");
+      const path = require("path");
+      const avatarPath = path.join(
+        __dirname,
+        "../uploads/avatars",
+        path.basename(user.avatar)
+      );
+      if (fs.existsSync(avatarPath)) {
+        fs.unlinkSync(avatarPath);
+      }
+    }
+
+    // Mettre à jour la base de données
+    await user.update({ avatar: null });
+
+    res.json({ message: "Avatar supprimé avec succès" });
+  } catch (error) {
+    console.error("Erreur suppression avatar:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
+// @route   POST /api/users/request-verification
+// @desc    Demander la vérification du compte
+// @access  Private
+router.post("/request-verification", auth, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Votre compte est déjà vérifié" });
+    }
+
+    // Vérifier si une demande n'est pas déjà en cours
+    if (user.verificationRequested) {
+      return res.status(400).json({
+        message: "Une demande de vérification est déjà en cours",
+      });
+    }
+
+    // Marquer la demande comme en cours
+    await user.update({
+      verificationRequested: true,
+      verificationRequestedAt: new Date(),
+    });
+
+    // Envoyer un email de notification aux admins (optionnel)
+    // ... code pour envoyer l'email ...
+
+    res.json({
+      message: "Demande de vérification envoyée avec succès",
+    });
+  } catch (error) {
+    console.error("Erreur demande vérification:", error);
     res.status(500).json({ message: "Erreur serveur" });
   }
 });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSocket } from "../../hooks/useSocket";
 import { useAuth } from "../../contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const RealTimeBidding = ({ auction, onBidUpdate }) => {
   const { user } = useAuth();
@@ -356,7 +356,13 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
           <p className="text-gray-600 mb-3">
             Connectez-vous pour participer à cette enchère
           </p>
-          <button className="btn-primary">Se connecter</button>
+          {/* <button className="btn-primary">Se connecter</button> */}
+          <Link
+            to="/login"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
+          >
+            Se connecter
+          </Link>
         </div>
       )}
 
