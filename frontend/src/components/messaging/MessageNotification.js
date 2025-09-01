@@ -24,7 +24,7 @@ const MessageNotification = () => {
   const fetchUnreadMessages = async () => {
     try {
       const response = await axios.get(
-        "http://localhost:5000/api/messages/unread"
+        "http://localhost:5000/api/messages/unread-count"
       );
       setUnreadCount(response.data.unreadCount || 0);
       setRecentMessages(response.data.recentMessages || []);
