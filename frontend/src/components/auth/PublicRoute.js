@@ -20,7 +20,7 @@ const PublicRoute = ({ children }) => {
 
   // Rediriger vers la page précédente ou l'accueil si déjà authentifié
   if (user) {
-    const from = location.state?.from?.pathname || "/";
+    const from = location.state?.from?.pathname || "/auctions";
     return <Navigate to={from} replace />;
   }
 
