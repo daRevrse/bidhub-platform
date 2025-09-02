@@ -1,4 +1,11 @@
-const { Review, UserReputation, User, Auction, Badge } = require("../models");
+const {
+  Review,
+  UserReputation,
+  User,
+  Auction,
+  Badge,
+  Product,
+} = require("../models");
 const { Op } = require("sequelize");
 
 class ReputationService {

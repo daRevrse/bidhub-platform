@@ -22,6 +22,8 @@ const UserReputation = ({ userId, showDetails = true }) => {
       setReputation(response.data);
     } catch (error) {
       console.error("Erreur chargement réputation:", error);
+    } finally {
+      setLoading(false);
     }
   };
 

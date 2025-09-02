@@ -90,7 +90,7 @@ router.get("/public/:userId", async (req, res) => {
           {
             model: Auction,
             as: "auction",
-            attributes: ["id", "currentPrice", "status", "endDate"],
+            attributes: ["id", "currentPrice", "status", "endTime"],
             required: false,
           },
         ],
