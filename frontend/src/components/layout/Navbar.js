@@ -59,7 +59,12 @@ const Navbar = () => {
       public: false,
       roles: ["seller", "admin"],
     },
-    { name: "Avis", href: "/reviews", public: true },
+    {
+      name: "Avis",
+      href: "/reviews",
+      public: false,
+      roles: ["user", "seller", "admin"],
+    },
     { name: "Comment ça marche", href: "/how-it-works", public: true },
   ];
 

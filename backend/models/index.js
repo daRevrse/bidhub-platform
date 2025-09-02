@@ -1,4 +1,4 @@
-// backend/models/index.js - MISE À JOUR COMPLÈTE
+// backend/models/index.js - VERSION COMPLÈTE MISE À JOUR
 const { Sequelize } = require("sequelize");
 const dotenv = require("dotenv");
 
@@ -26,10 +26,12 @@ const UserReputation = require("./UserReputation")(sequelize);
 const Badge = require("./Badge")(sequelize);
 const Conversation = require("./Conversation")(sequelize);
 const Message = require("./Message")(sequelize);
-
-// Import des nouveaux modèles d'administration
 const Setting = require("./Setting")(sequelize);
 const AuditLog = require("./AuditLog")(sequelize);
+
+// Import des nouveaux modèles
+const UserFavorite = require("./UserFavorite")(sequelize);
+const AuctionView = require("./AuctionView")(sequelize);
 
 // Relations existantes
 User.hasMany(Product, { foreignKey: "sellerId", as: "products" });
@@ -103,6 +105,20 @@ Message.belongsTo(Message, { foreignKey: "replyToId", as: "replyTo" });
 User.hasMany(AuditLog, { foreignKey: "userId", as: "auditLogs" });
 AuditLog.belongsTo(User, { foreignKey: "userId", as: "user" });
 
+// NOUVELLES RELATIONS - UserFavorite
+User.hasMany(UserFavorite, { foreignKey: "userId", as: "favorites" });
+UserFavorite.belongsTo(User, { foreignKey: "userId", as: "user" });
+
+Auction.hasMany(UserFavorite, { foreignKey: "auctionId", as: "favoritedBy" });
+UserFavorite.belongsTo(Auction, { foreignKey: "auctionId", as: "auction" });
+
+// NOUVELLES RELATIONS - AuctionView
+User.hasMany(AuctionView, { foreignKey: "userId", as: "views" });
+AuctionView.belongsTo(User, { foreignKey: "userId", as: "user" });
+
+Auction.hasMany(AuctionView, { foreignKey: "auctionId", as: "viewedBy" });
+AuctionView.belongsTo(Auction, { foreignKey: "auctionId", as: "auction" });
+
 module.exports = {
   sequelize,
   User,
@@ -117,4 +133,6 @@ module.exports = {
   Message,
   Setting,
   AuditLog,
+  UserFavorite,
+  AuctionView,
 };

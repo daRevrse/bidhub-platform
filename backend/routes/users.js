@@ -471,4 +471,209 @@ router.post("/request-verification", auth, async (req, res) => {
   }
 });
 
+// @route   GET /api/users/favorites
+// @desc    Obtenir les favoris de l'utilisateur connecté
+// @access  Private
+router.get("/favorites", auth, async (req, res) => {
+  try {
+    const { UserFavorite } = require("../models");
+
+    const favorites = await UserFavorite.findAll({
+      where: { userId: req.user.userId },
+      include: [
+        {
+          model: Auction,
+          as: "auction",
+          include: [
+            {
+              model: Product,
+              as: "product",
+              attributes: ["id", "title", "images", "sellerId"],
+              include: [
+                {
+                  model: User,
+                  as: "seller",
+                  attributes: ["id", "firstName", "lastName"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.json(favorites);
+  } catch (error) {
+    console.error("Erreur récupération favoris:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
+// @route   POST /api/users/favorites
+// @desc    Ajouter une enchère aux favoris
+// @access  Private
+router.post("/favorites", auth, async (req, res) => {
+  try {
+    const { auctionId } = req.body;
+    const { UserFavorite } = require("../models");
+
+    if (!auctionId) {
+      return res.status(400).json({ message: "ID de l'enchère requis" });
+    }
+
+    // Vérifier que l'enchère existe
+    const auction = await Auction.findByPk(auctionId);
+    if (!auction) {
+      return res.status(404).json({ message: "Enchère non trouvée" });
+    }
+
+    // Vérifier si pas déjà en favoris
+    const existingFavorite = await UserFavorite.findOne({
+      where: {
+        userId: req.user.userId,
+        auctionId: auctionId,
+      },
+    });
+
+    if (existingFavorite) {
+      return res.status(400).json({ message: "Enchère déjà dans les favoris" });
+    }
+
+    const favorite = await UserFavorite.create({
+      userId: req.user.userId,
+      auctionId: auctionId,
+    });
+
+    res.status(201).json({
+      message: "Ajouté aux favoris",
+      favorite,
+    });
+  } catch (error) {
+    console.error("Erreur ajout favori:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
+// @route   DELETE /api/users/favorites/:auctionId
+// @desc    Retirer une enchère des favoris
+// @access  Private
+router.delete("/favorites/:auctionId", auth, async (req, res) => {
+  try {
+    const { auctionId } = req.params;
+    const { UserFavorite } = require("../models");
+
+    const favorite = await UserFavorite.findOne({
+      where: {
+        userId: req.user.userId,
+        auctionId: auctionId,
+      },
+    });
+
+    if (!favorite) {
+      return res.status(404).json({ message: "Favori non trouvé" });
+    }
+
+    await favorite.destroy();
+
+    res.json({ message: "Retiré des favoris" });
+  } catch (error) {
+    console.error("Erreur suppression favori:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
+// @route   GET /api/users/:userId/profile
+// @desc    Obtenir le profil détaillé d'un utilisateur avec statistiques
+// @access  Public
+router.get("/:userId/profile", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findByPk(userId, {
+      attributes: [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "phone",
+        "role",
+        "avatar",
+        "bio",
+        "city",
+        "country",
+        "createdAt",
+        "isVerified",
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
+    }
+
+    // Calculer les statistiques
+    const stats = {
+      totalSales: await Auction.count({
+        include: [
+          {
+            model: Product,
+            as: "product",
+            where: { sellerId: userId },
+            attributes: [],
+          },
+        ],
+        where: { status: "ended" },
+      }),
+      activeAuctions: await Auction.count({
+        include: [
+          {
+            model: Product,
+            as: "product",
+            where: { sellerId: userId },
+            attributes: [],
+          },
+        ],
+        where: { status: "active" },
+      }),
+      totalProducts: await Product.count({
+        where: { sellerId: userId },
+      }),
+    };
+
+    // Calculer la réputation moyenne
+    let reputation = null;
+    try {
+      const reviews = await Review.findAll({
+        where: { revieweeId: userId },
+        attributes: ["rating"],
+      });
+
+      if (reviews.length > 0) {
+        const totalRating = reviews.reduce(
+          (sum, review) => sum + review.rating,
+          0
+        );
+        reputation = {
+          averageRating: totalRating / reviews.length,
+          totalReviews: reviews.length,
+        };
+      }
+    } catch (error) {
+      console.log("Erreur calcul réputation:", error);
+    }
+
+    const userProfile = {
+      ...user.toJSON(),
+      stats,
+      reputation,
+      productsCount: stats.totalProducts,
+    };
+
+    res.json(userProfile);
+  } catch (error) {
+    console.error("Erreur récupération profil utilisateur:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
+
 module.exports = router;

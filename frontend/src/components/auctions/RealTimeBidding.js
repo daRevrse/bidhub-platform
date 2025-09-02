@@ -20,7 +20,7 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
   useEffect(() => {
     const updateTimeRemaining = () => {
       const now = new Date();
-      const end = new Date(auction.endTime);
+      const end = new Date(auction?.endTime);
       const diff = Math.max(0, end - now);
       setTimeRemaining(Math.floor(diff / 1000));
     };
@@ -28,14 +28,14 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
     updateTimeRemaining();
     const interval = setInterval(updateTimeRemaining, 1000);
     return () => clearInterval(interval);
-  }, [auction.endTime]);
+  }, [auction?.endTime]);
 
   // Gestion des événements socket
   useEffect(() => {
     if (!socket || !user) return;
 
     // Rejoindre la salle d'enchère
-    socket.emit("join_auction", auction.id);
+    socket.emit("join_auction", auction?.id);
 
     // Écouter les événements
     const handleAuctionJoined = (data) => {
@@ -118,7 +118,7 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
 
     // Cleanup
     return () => {
-      socket.emit("leave_auction", auction.id);
+      socket.emit("leave_auction", auction?.id);
       socket.off("auction_joined", handleAuctionJoined);
       socket.off("new_bid", handleNewBid);
       socket.off("bid_placed", handleBidPlaced);
@@ -129,7 +129,7 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
       socket.off("auction_ended", handleAuctionEnded);
       socket.off("auction_ended_no_bids", handleAuctionEndedNoBids);
     };
-  }, [socket, auction.id, user, onBidUpdate]);
+  }, [socket, auction?.id, user, onBidUpdate]);
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat("fr-FR").format(price) + " FCFA";
@@ -157,9 +157,9 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
     }
 
     const amount = parseFloat(bidAmount);
-    if (isNaN(amount) || amount <= auction.currentPrice) {
+    if (isNaN(amount) || amount <= auction?.currentPrice) {
       setMessage(
-        `L'offre doit être supérieure à ${formatPrice(auction.currentPrice)}`
+        `L'offre doit être supérieure à ${formatPrice(auction?.currentPrice)}`
       );
       setTimeout(() => setMessage(""), 3000);
       return;
@@ -167,13 +167,13 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
 
     setBidding(true);
     socket.emit("place_bid", {
-      auctionId: auction.id,
+      auctionId: auction?.id,
       amount,
     });
   };
 
   const canBid =
-    user && auction.product.sellerId !== user.id && timeRemaining > 0;
+    user && auction?.product.sellerId !== user.id && timeRemaining > 0;
 
   return (
     <div className="space-y-6">
@@ -237,17 +237,18 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
           <form onSubmit={handleBidSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Votre offre (minimum: {formatPrice(auction.currentPrice + 100)})
+                Votre offre (minimum: {formatPrice(auction?.currentPrice + 100)}
+                )
               </label>
               <div className="flex space-x-2">
                 <input
                   type="number"
                   value={bidAmount}
                   onChange={(e) => setBidAmount(e.target.value)}
-                  min={auction.currentPrice + 100}
+                  min={auction?.currentPrice + 100}
                   step="100"
                   className="flex-1 form-input"
-                  placeholder={`${auction.currentPrice + 1000}`}
+                  placeholder={`${auction?.currentPrice + 1000}`}
                   disabled={bidding}
                 />
                 <button
@@ -274,7 +275,7 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
             <div className="flex space-x-2">
               <button
                 type="button"
-                onClick={() => setBidAmount(auction.currentPrice + 500)}
+                onClick={() => setBidAmount(auction?.currentPrice + 500)}
                 className="btn-secondary text-sm"
                 disabled={bidding}
               >
@@ -282,7 +283,7 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
               </button>
               <button
                 type="button"
-                onClick={() => setBidAmount(auction.currentPrice + 1000)}
+                onClick={() => setBidAmount(auction?.currentPrice + 1000)}
                 className="btn-secondary text-sm"
                 disabled={bidding}
               >
@@ -290,7 +291,7 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
               </button>
               <button
                 type="button"
-                onClick={() => setBidAmount(auction.currentPrice + 5000)}
+                onClick={() => setBidAmount(auction?.currentPrice + 5000)}
                 className="btn-secondary text-sm"
                 disabled={bidding}
               >
@@ -366,7 +367,7 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
         </div>
       )}
 
-      {user && auction.product.sellerId === user.id && (
+      {user && auction?.product.sellerId === user.id && (
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-center">
           <p className="text-blue-700">
             C'est votre enchère - vous pouvez suivre les offres en temps réel
@@ -382,13 +383,13 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
         </div>
       )}
 
-      {user && auction.winnerId === user.id && auction.status === "ended" && (
+      {user && auction?.winnerId === user.id && auction?.status === "ended" && (
         <div className="bg-green-50 border border-green-200 p-4 rounded-lg text-center">
           <p className="text-green-700 font-medium mb-3">
             🎉 Félicitations ! Vous avez remporté cette enchère
           </p>
           <button
-            onClick={() => navigate(`/payment/${auction.id}`)}
+            onClick={() => navigate(`/payment/${auction?.id}`)}
             className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg"
           >
             💳 Finaliser le paiement

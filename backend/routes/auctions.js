@@ -179,11 +179,9 @@ router.post("/:id/bid", auth, async (req, res) => {
     }
 
     if (auction.product.sellerId === req.user.userId) {
-      return res
-        .status(400)
-        .json({
-          message: "Vous ne pouvez pas enchérir sur votre propre produit",
-        });
+      return res.status(400).json({
+        message: "Vous ne pouvez pas enchérir sur votre propre produit",
+      });
     }
 
     // Créer l'offre
@@ -203,6 +201,47 @@ router.post("/:id/bid", auth, async (req, res) => {
   } catch (error) {
     console.error("Erreur placement offre:", error);
     res.status(500).json({ message: "Erreur lors du placement de l'offre" });
+  }
+});
+
+// @route   POST /api/auctions/:id/view
+// @desc    Marquer une enchère comme vue
+// @access  Private
+router.post("/:id/view", auth, async (req, res) => {
+  try {
+    const auctionId = req.params.id;
+    const userId = req.user.userId;
+    const { AuctionView } = require("../models");
+
+    // Vérifier que l'enchère existe
+    const auction = await Auction.findByPk(auctionId);
+    if (!auction) {
+      return res.status(404).json({ message: "Enchère non trouvée" });
+    }
+
+    // Vérifier si l'utilisateur a déjà vu cette enchère
+    const existingView = await AuctionView.findOne({
+      where: {
+        userId: userId,
+        auctionId: auctionId,
+      },
+    });
+
+    if (!existingView) {
+      // Créer une nouvelle vue
+      await AuctionView.create({
+        userId: userId,
+        auctionId: auctionId,
+      });
+
+      // Incrémenter le compteur de vues de l'enchère
+      await auction.increment("views", { by: 1 });
+    }
+
+    res.json({ message: "Vue enregistrée" });
+  } catch (error) {
+    console.error("Erreur enregistrement vue:", error);
+    res.status(500).json({ message: "Erreur serveur" });
   }
 });
 
