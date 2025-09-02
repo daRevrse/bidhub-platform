@@ -1,3 +1,4 @@
+// backend/models/index.js - MISE À JOUR COMPLÈTE
 const { Sequelize } = require("sequelize");
 const dotenv = require("dotenv");
 
@@ -23,10 +24,12 @@ const Payment = require("./Payment")(sequelize);
 const Review = require("./Review")(sequelize);
 const UserReputation = require("./UserReputation")(sequelize);
 const Badge = require("./Badge")(sequelize);
-
-// Import des nouveaux modèles de messagerie
 const Conversation = require("./Conversation")(sequelize);
 const Message = require("./Message")(sequelize);
+
+// Import des nouveaux modèles d'administration
+const Setting = require("./Setting")(sequelize);
+const AuditLog = require("./AuditLog")(sequelize);
 
 // Relations existantes
 User.hasMany(Product, { foreignKey: "sellerId", as: "products" });
@@ -61,7 +64,7 @@ Review.belongsTo(Auction, { foreignKey: "auctionId", as: "auction" });
 User.hasOne(UserReputation, { foreignKey: "userId", as: "reputation" });
 UserReputation.belongsTo(User, { foreignKey: "userId", as: "user" });
 
-// Relations Conversation - CORRECTION ICI
+// Relations Conversation
 User.hasMany(Conversation, {
   foreignKey: "participant1Id",
   as: "conversations1",
@@ -96,6 +99,10 @@ Message.belongsTo(Conversation, {
 Message.hasMany(Message, { foreignKey: "replyToId", as: "replies" });
 Message.belongsTo(Message, { foreignKey: "replyToId", as: "replyTo" });
 
+// Relations AuditLog
+User.hasMany(AuditLog, { foreignKey: "userId", as: "auditLogs" });
+AuditLog.belongsTo(User, { foreignKey: "userId", as: "user" });
+
 module.exports = {
   sequelize,
   User,
@@ -108,4 +115,6 @@ module.exports = {
   Badge,
   Conversation,
   Message,
+  Setting,
+  AuditLog,
 };

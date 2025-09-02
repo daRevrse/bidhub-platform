@@ -18,6 +18,7 @@ import {
   ShieldCheckIcon,
   BellIcon,
 } from "@heroicons/react/24/outline";
+import UserManagement from "../../components/admin/UserManagement";
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -274,7 +275,7 @@ const AdminDashboard = () => {
                       <div className="flex items-center space-x-3">
                         {auction.product?.images?.[0] ? (
                           <img
-                            src={auction.product.images[0]}
+                            src={`http://localhost:5000/uploads/products/${auction.product.images[0]}`}
                             alt=""
                             className="w-12 h-12 rounded-lg object-cover"
                           />
@@ -346,9 +347,9 @@ const AdminDashboard = () => {
                       className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
                     >
                       <div className="flex items-center space-x-3">
-                        {user.profileImage ? (
+                        {user.avatar ? (
                           <img
-                            src={user.profileImage}
+                            src={`http://localhost:5000${user.avatar}`}
                             alt=""
                             className="w-12 h-12 rounded-full object-cover"
                           />
@@ -483,21 +484,7 @@ const AdminDashboard = () => {
       {activeTab === "verifications" && <VerificationManagement />}
 
       {/* Onglet Utilisateurs */}
-      {activeTab === "users" && (
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <div className="text-center py-12">
-            <UsersIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Gestion des utilisateurs
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Cette section sera bientôt disponible avec la liste complète des
-              utilisateurs.
-            </p>
-            <button className="btn-primary">Voir tous les utilisateurs</button>
-          </div>
-        </div>
-      )}
+      {activeTab === "users" && <UserManagement />}
 
       {/* Onglet Système */}
       {activeTab === "system" && (
@@ -556,7 +543,10 @@ const AdminDashboard = () => {
               Actions système
             </h3>
             <div className="grid md:grid-cols-2 gap-4">
-              <button className="p-4 text-left border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+              <button
+                onClick={() => navigate("/admin/logs")}
+                className="p-4 text-left border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+              >
                 <div className="flex items-center space-x-3">
                   <div className="p-2 bg-blue-100 rounded-lg">
                     <DocumentTextIcon className="w-5 h-5 text-blue-600" />
@@ -584,7 +574,10 @@ const AdminDashboard = () => {
                 </div>
               </button>
 
-              <button className="p-4 text-left border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+              <button
+                onClick={() => navigate("/admin/settings")}
+                className="p-4 text-left border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+              >
                 <div className="flex items-center space-x-3">
                   <div className="p-2 bg-green-100 rounded-lg">
                     <Cog6ToothIcon className="w-5 h-5 text-green-600" />

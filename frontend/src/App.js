@@ -20,6 +20,11 @@ import UserProfile from "./pages/users/UserProfile";
 import MessagesPage from "./pages/messages/MessagesPage";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import PublicRoute from "./components/auth/PublicRoute";
+import AuctionManagement from "./components/admin/AuctionManagement";
+import Reports from "./components/admin/Reports";
+import UserManagement from "./components/admin/UserManagement";
+import AdminSettings from "./components/admin/AdminSettings";
+import AuditLogs from "./components/admin/AuditLogs";
 
 function App() {
   return (
@@ -169,6 +174,15 @@ function App() {
                 }
               />
 
+              <Route
+                path="/admin/logs"
+                element={
+                  <PrivateRoute roles={["admin"]}>
+                    <AuditLogs />
+                  </PrivateRoute>
+                }
+              />
+
               {/* Route 404 */}
               <Route path="*" element={<NotFound />} />
             </Routes>
@@ -266,49 +280,49 @@ const Privacy = () => (
 );
 
 // Composants d'administration temporaires
-const UserManagement = () => (
-  <div className="max-w-7xl mx-auto px-4 py-8">
-    <h1 className="text-3xl font-bold text-gray-900 mb-8">
-      Gestion des utilisateurs
-    </h1>
-    <div className="bg-white rounded-lg shadow p-6">
-      <p>Interface de gestion des utilisateurs à venir...</p>
-    </div>
-  </div>
-);
+// const UserManagement = () => (
+//   <div className="max-w-7xl mx-auto px-4 py-8">
+//     <h1 className="text-3xl font-bold text-gray-900 mb-8">
+//       Gestion des utilisateurs
+//     </h1>
+//     <div className="bg-white rounded-lg shadow p-6">
+//       <p>Interface de gestion des utilisateurs à venir...</p>
+//     </div>
+//   </div>
+// );
 
-const AuctionManagement = () => (
-  <div className="max-w-7xl mx-auto px-4 py-8">
-    <h1 className="text-3xl font-bold text-gray-900 mb-8">
-      Gestion des enchères
-    </h1>
-    <div className="bg-white rounded-lg shadow p-6">
-      <p>Interface de gestion des enchères à venir...</p>
-    </div>
-  </div>
-);
+// const AuctionManagement = () => (
+//   <div className="max-w-7xl mx-auto px-4 py-8">
+//     <h1 className="text-3xl font-bold text-gray-900 mb-8">
+//       Gestion des enchères
+//     </h1>
+//     <div className="bg-white rounded-lg shadow p-6">
+//       <p>Interface de gestion des enchères à venir...</p>
+//     </div>
+//   </div>
+// );
 
-const Reports = () => (
-  <div className="max-w-7xl mx-auto px-4 py-8">
-    <h1 className="text-3xl font-bold text-gray-900 mb-8">
-      Rapports et analyses
-    </h1>
-    <div className="bg-white rounded-lg shadow p-6">
-      <p>Interface de rapports à venir...</p>
-    </div>
-  </div>
-);
+// const Reports = () => (
+//   <div className="max-w-7xl mx-auto px-4 py-8">
+//     <h1 className="text-3xl font-bold text-gray-900 mb-8">
+//       Rapports et analyses
+//     </h1>
+//     <div className="bg-white rounded-lg shadow p-6">
+//       <p>Interface de rapports à venir...</p>
+//     </div>
+//   </div>
+// );
 
-const AdminSettings = () => (
-  <div className="max-w-7xl mx-auto px-4 py-8">
-    <h1 className="text-3xl font-bold text-gray-900 mb-8">
-      Paramètres administrateur
-    </h1>
-    <div className="bg-white rounded-lg shadow p-6">
-      <p>Interface de paramètres à venir...</p>
-    </div>
-  </div>
-);
+// const AdminSettings = () => (
+//   <div className="max-w-7xl mx-auto px-4 py-8">
+//     <h1 className="text-3xl font-bold text-gray-900 mb-8">
+//       Paramètres administrateur
+//     </h1>
+//     <div className="bg-white rounded-lg shadow p-6">
+//       <p>Interface de paramètres à venir...</p>
+//     </div>
+//   </div>
+// );
 
 // Composant pour la page 404
 const NotFound = () => {
