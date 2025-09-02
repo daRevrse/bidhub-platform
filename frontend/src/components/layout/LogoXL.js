@@ -1,9 +1,9 @@
-export const Logo = () => (
+export const LogoXL = () => (
   <svg
-    width="40"
+    width="80"
     zoomAndPan="magnify"
     viewBox="0 0 900 899.99999"
-    height="40"
+    height="80"
     preserveAspectRatio="xMidYMid meet"
     version="1.0"
   >

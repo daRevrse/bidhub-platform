@@ -1,7 +1,9 @@
+// frontend/src/components/layout/Navbar.js - VERSION CORRIGÉE
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import MessageNotification from "../messaging/MessageNotification";
+import NotificationDropdown from "../notifications/NotificationDropdown";
 import {
   Bars3Icon,
   XMarkIcon,
@@ -68,7 +70,11 @@ const Navbar = () => {
     { name: "Comment ça marche", href: "/how-it-works", public: true },
   ];
 
+  // CORRECTION: Amélioration de la fonction isActiveLink
   const isActiveLink = (href) => {
+    if (href === "/") {
+      return location.pathname === "/";
+    }
     return (
       location.pathname === href || location.pathname.startsWith(href + "/")
     );
@@ -85,23 +91,19 @@ const Navbar = () => {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <Link to="/" className="flex items-center space-x-2 group">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                {/* <svg
-                  className="w-5 h-5 text-white font-bold"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                </svg> */}
-                <Logo />
+            {/* CORRECTION: Logo avec dimensions fixes pour éviter qu'il soit cliquable sur toute la hauteur */}
+            <Link
+              to="/"
+              className="flex items-center space-x-2 group flex-shrink-0"
+            >
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200 flex-shrink-0">
+                <Logo className="w-5 h-5 text-white" />
               </div>
-              <div className="flex flex-col">
-                <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <div className="flex flex-col h-8 justify-center">
+                <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-none">
                   BidHub
                 </span>
-                <span className="text-xs text-gray-500 -mt-1">Togo</span>
+                <span className="text-xs text-gray-500 leading-none">Togo</span>
               </div>
             </Link>
 
@@ -115,20 +117,25 @@ const Navbar = () => {
 
                 if (!shouldShow) return null;
 
+                const isActive = isActiveLink(item.href);
+
                 return (
                   <Link
                     key={item.name}
                     to={item.href}
                     className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 relative group ${
-                      isActiveLink(item.href)
-                        ? "text-blue-600 bg-blue-50"
+                      isActive
+                        ? "text-blue-600 bg-blue-50 shadow-sm"
                         : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
                     }`}
                   >
                     {item.name}
+                    {/* CORRECTION: Indicateur visuel plus clair pour les liens actifs */}
                     <div
-                      className={`absolute bottom-0 left-1/2 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 group-hover:w-full group-hover:left-0 ${
-                        isActiveLink(item.href) ? "w-full left-0" : ""
+                      className={`absolute bottom-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-200 ${
+                        isActive
+                          ? "w-full left-0"
+                          : "w-0 group-hover:w-full group-hover:left-0"
                       }`}
                     />
                   </Link>
@@ -137,101 +144,96 @@ const Navbar = () => {
             </div>
 
             {/* User Actions */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               {user ? (
                 <>
-                  {/* Messages (Desktop) */}
-                  <div className="hidden md:block">
-                    <MessageNotification />
-                  </div>
+                  {/* NOUVEAU: Bouton de notifications */}
+                  <NotificationDropdown />
 
-                  {/* Profile Menu */}
+                  {/* Messages */}
+                  <MessageNotification />
+
+                  {/* User Profile */}
                   <div className="relative">
                     <button
                       onClick={toggleProfileMenu}
                       className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
                     >
-                      <div
-                        className={
-                          user.avatar
-                            ? "w-8 h-8 rounded-full flex items-center justify-center"
-                            : "w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center"
-                        }
-                      >
-                        {user.avatar ? (
-                          <img
-                            src={`http://localhost:5000${user.avatar}`}
-                            alt="Avatar"
-                            className="w-full h-full rounded-full"
-                          />
-                        ) : (
-                          <span className="text-white font-semibold text-sm">
-                            {user.firstName[0]}
-                            {user.lastName[0]}
-                          </span>
-                        )}
-                      </div>
-                      <div className="hidden md:block text-left">
-                        <div className="text-sm font-medium text-gray-900">
+                      {user.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt={user.firstName}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <UserCircleIcon className="w-8 h-8 text-gray-600" />
+                      )}
+                      <div className="hidden md:flex flex-col items-start">
+                        <span className="text-sm font-medium text-gray-900">
                           {user.firstName}
-                        </div>
-                        <div className="text-xs text-gray-500 capitalize">
-                          {user.role === "seller"
-                            ? "Vendeur"
-                            : user.role === "admin"
-                            ? "Admin"
-                            : "Acheteur"}
-                        </div>
+                        </span>
+                        <span className="text-xs text-gray-500 capitalize">
+                          {user.role}
+                        </span>
                       </div>
-                      <ChevronDownIcon
-                        className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
-                          isProfileMenuOpen ? "rotate-180" : ""
-                        }`}
-                      />
+                      <ChevronDownIcon className="w-4 h-4 text-gray-500" />
                     </button>
 
-                    {/* Dropdown Menu */}
+                    {/* Profile Dropdown */}
                     {isProfileMenuOpen && (
-                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
-                        <div className="px-4 py-2 border-b border-gray-100">
-                          <div className="text-sm font-medium text-gray-900">
-                            {user.firstName} {user.lastName}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {user.email}
+                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg ring-1 ring-black/5 z-50">
+                        <div className="p-4 border-b border-gray-100">
+                          <div className="flex items-center space-x-3">
+                            {user.avatar ? (
+                              <img
+                                src={user.avatar}
+                                alt={user.firstName}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <UserCircleIcon className="w-10 h-10 text-gray-600" />
+                            )}
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                {user.firstName} {user.lastName}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {user.email}
+                              </p>
+                            </div>
                           </div>
                         </div>
-
-                        <Link
-                          to="/profile"
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                        >
-                          <UserCircleIcon className="w-4 h-4 mr-3" />
-                          Mon profil
-                        </Link>
-
-                        <Link
-                          to="/messages"
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors md:hidden"
-                        >
-                          <BellIcon className="w-4 h-4 mr-3" />
-                          Messages
-                        </Link>
-
-                        {user.role === "admin" && (
+                        <div className="py-2">
                           <Link
-                            to="/admin"
-                            className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                            to="/profile"
+                            onClick={() => setIsProfileMenuOpen(false)}
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            <UserCircleIcon className="w-4 h-4 mr-3" />
+                            Mon Profil
+                          </Link>
+                          {/* <Link
+                            to="/settings"
+                            onClick={() => setIsProfileMenuOpen(false)}
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                           >
                             <CogIcon className="w-4 h-4 mr-3" />
-                            Administration
-                          </Link>
-                        )}
-
-                        <div className="border-t border-gray-100 mt-2 pt-2">
+                            Paramètres
+                          </Link> */}
+                          {user.role === "admin" && (
+                            <Link
+                              to="/admin"
+                              onClick={() => setIsProfileMenuOpen(false)}
+                              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              <CogIcon className="w-4 h-4 mr-3" />
+                              Administration
+                            </Link>
+                          )}
+                          <hr className="my-2" />
                           <button
                             onClick={handleLogout}
-                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                            className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                           >
                             <ArrowRightOnRectangleIcon className="w-4 h-4 mr-3" />
                             Déconnexion
@@ -285,12 +287,14 @@ const Navbar = () => {
 
                 if (!shouldShow) return null;
 
+                const isActive = isActiveLink(item.href);
+
                 return (
                   <Link
                     key={item.name}
                     to={item.href}
                     className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
-                      isActiveLink(item.href)
+                      isActive
                         ? "text-blue-600 bg-blue-50"
                         : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
                     }`}

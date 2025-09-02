@@ -11,6 +11,7 @@ import {
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import { Logo } from "./Logo";
+import { LogoXL } from "./LogoXL";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -193,9 +194,7 @@ const Footer = () => {
           {/* À propos de BidHub */}
           <div className="lg:col-span-1">
             <div className="mb-6">
-              {/* <div className="w-2 h-2">
-                <Logo />
-              </div> */}
+              <LogoXL />
 
               <h3 className="text-2xl font-bold mb-3 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
                 BidHub Togo

@@ -42,6 +42,7 @@ import Legal from "./pages/legal/Legal";
 import Terms from "./pages/legal/Terms";
 import Privacy from "./pages/legal/Privacy";
 import Cookies from "./pages/legal/Cookies";
+import CreateProductWizard from "./pages/products/CreateProductWizard";
 
 function App() {
   return (
@@ -124,7 +125,8 @@ function App() {
                 path="/create-product"
                 element={
                   <PrivateRoute roles={["seller", "admin"]}>
-                    <CreateProduct />
+                    {/* <CreateProduct /> */}
+                    <CreateProductWizard />
                   </PrivateRoute>
                 }
               />
