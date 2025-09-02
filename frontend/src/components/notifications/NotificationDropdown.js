@@ -40,9 +40,12 @@ const NotificationDropdown = () => {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const response = await axios.get("/api/notifications", {
-        params: { limit: 10 },
-      });
+      const response = await axios.get(
+        "http://localhost:5000/api/notifications",
+        {
+          params: { limit: 10 },
+        }
+      );
 
       const notifs = response.data.notifications || [];
       setNotifications(notifs);
@@ -56,7 +59,9 @@ const NotificationDropdown = () => {
 
   const markAsRead = async (notificationId) => {
     try {
-      await axios.put(`/api/notifications/${notificationId}/read`);
+      await axios.put(
+        `http://localhost:5000/api/notifications/${notificationId}/read`
+      );
 
       // Mettre à jour localement
       setNotifications((prev) =>

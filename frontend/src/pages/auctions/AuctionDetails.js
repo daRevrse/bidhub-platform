@@ -233,7 +233,7 @@ const AuctionDetails = () => {
       setBidding(true);
       setBidError("");
 
-      const response = await axios.post(
+      await axios.post(
         `http://localhost:5000/api/auctions/${id}/bid`,
         { amount: parseFloat(bidAmount) },
         {

@@ -9,48 +9,49 @@ const {
   UserFavorite,
 } = require("../models");
 const { Op } = require("sequelize");
+const notificationService = require("../services/notificationService");
 
 const router = express.Router();
 
 // @route   GET /api/auctions
 // @desc    Obtenir toutes les enchères actives
 // @access  Public
-// router.get("/", async (req, res) => {
-//   try {
-//     const { status = "active", page = 1, limit = 12 } = req.query;
-//     const offset = (page - 1) * limit;
+router.get("/", async (req, res) => {
+  try {
+    const { status = "active", page = 1, limit = 12 } = req.query;
+    const offset = (page - 1) * limit;
 
-//     const auctions = await Auction.findAndCountAll({
-//       where: { status },
-//       include: [
-//         {
-//           model: Product,
-//           as: "product",
-//           include: [
-//             {
-//               model: User,
-//               as: "seller",
-//               attributes: ["id", "firstName", "lastName"],
-//             },
-//           ],
-//         },
-//       ],
-//       limit: parseInt(limit),
-//       offset: parseInt(offset),
-//       order: [["endTime", "ASC"]],
-//     });
+    const auctions = await Auction.findAndCountAll({
+      where: { status },
+      include: [
+        {
+          model: Product,
+          as: "product",
+          include: [
+            {
+              model: User,
+              as: "seller",
+              attributes: ["id", "firstName", "lastName"],
+            },
+          ],
+        },
+      ],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [["endTime", "ASC"]],
+    });
 
-//     res.json({
-//       auctions: auctions.rows,
-//       totalPages: Math.ceil(auctions.count / limit),
-//       currentPage: parseInt(page),
-//       totalAuctions: auctions.count,
-//     });
-//   } catch (error) {
-//     console.error("Erreur récupération enchères:", error);
-//     res.status(500).json({ message: "Erreur serveur" });
-//   }
-// });
+    res.json({
+      auctions: auctions.rows,
+      totalPages: Math.ceil(auctions.count / limit),
+      currentPage: parseInt(page),
+      totalAuctions: auctions.count,
+    });
+  } catch (error) {
+    console.error("Erreur récupération enchères:", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+});
 
 // @route   GET /api/auctions/:id
 // @desc    Obtenir une enchère par ID avec ses offres
@@ -603,11 +604,9 @@ router.post("/:id/bid", auth, async (req, res) => {
 
     // Vérifier que l'utilisateur n'est pas le vendeur
     if (auction.product.seller.id === userId) {
-      return res
-        .status(400)
-        .json({
-          message: "Vous ne pouvez pas enchérir sur votre propre produit",
-        });
+      return res.status(400).json({
+        message: "Vous ne pouvez pas enchérir sur votre propre produit",
+      });
     }
 
     // Vérifier que l'offre est supérieure à l'offre actuelle
@@ -631,6 +630,14 @@ router.post("/:id/bid", auth, async (req, res) => {
 
     // Mettre à jour le prix courant de l'enchère
     await auction.update({ currentPrice: amount });
+
+    await notificationService.notifyBidPlaced(
+      auctionId,
+      req.user.userId, // ID du nouvel enchérisseur
+      amount, // Montant de l'enchère
+      auction.product.sellerId, // ID du vendeur
+      auction.product.title // Titre du produit
+    );
 
     // Récupérer l'offre créée avec les relations
     const createdBid = await Bid.findByPk(bid.id, {

@@ -43,175 +43,189 @@ import Terms from "./pages/legal/Terms";
 import Privacy from "./pages/legal/Privacy";
 import Cookies from "./pages/legal/Cookies";
 import CreateProductWizard from "./pages/products/CreateProductWizard";
+import { NotificationProvider } from "./contexts/NotificationContext";
+import { Toaster } from "react-hot-toast";
 
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <div className="min-h-screen flex flex-col bg-gray-50">
-          <Navbar />
-          <main className="flex-grow">
-            <Routes>
-              {/* Routes publiques principales */}
-              <Route path="/" element={<Home />} />
-              <Route path="/auctions" element={<AuctionList />} />
-              <Route path="/auction/:id" element={<AuctionDetails />} />
-              <Route path="/user/:userId" element={<UserProfile />} />
-              <Route path="/reviews" element={<ReviewsPage />} />
+      <NotificationProvider>
+        <Router>
+          <div className="min-h-screen flex flex-col bg-gray-50">
+            <Navbar />
+            <main className="flex-grow">
+              <Routes>
+                {/* Routes publiques principales */}
+                <Route path="/" element={<Home />} />
+                <Route path="/auctions" element={<AuctionList />} />
+                <Route path="/auction/:id" element={<AuctionDetails />} />
+                <Route path="/user/:userId" element={<UserProfile />} />
+                <Route path="/reviews" element={<ReviewsPage />} />
 
-              {/* Pages d'information */}
-              <Route path="/how-it-works" element={<HowItWorks />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/contact" element={<Contact />} />
-              {/* <Route path="/categories" element={<Categories />} /> */}
-              {/* <Route path="/become-seller" element={<BecomeSeller />} /> */}
-              <Route path="/faq" element={<FAQ />} />
-              {/* <Route path="/help" element={<Help />} /> */}
-              {/* <Route path="/blog" element={<Blog />} /> */}
-              {/* <Route path="/careers" element={<Careers />} /> */}
-              {/* <Route path="/press" element={<Press />} /> */}
-              {/* <Route path="/report" element={<Report />} /> */}
+                {/* Pages d'information */}
+                <Route path="/how-it-works" element={<HowItWorks />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/contact" element={<Contact />} />
+                {/* <Route path="/categories" element={<Categories />} /> */}
+                {/* <Route path="/become-seller" element={<BecomeSeller />} /> */}
+                <Route path="/faq" element={<FAQ />} />
+                {/* <Route path="/help" element={<Help />} /> */}
+                {/* <Route path="/blog" element={<Blog />} /> */}
+                {/* <Route path="/careers" element={<Careers />} /> */}
+                {/* <Route path="/press" element={<Press />} /> */}
+                {/* <Route path="/report" element={<Report />} /> */}
 
-              {/* Pages légales */}
-              <Route path="/terms" element={<Terms />} />
-              <Route path="/privacy" element={<Privacy />} />
-              <Route path="/legal" element={<Legal />} />
-              <Route path="/cookies" element={<Cookies />} />
+                {/* Pages légales */}
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/legal" element={<Legal />} />
+                <Route path="/cookies" element={<Cookies />} />
 
-              {/* Routes d'authentification (accessibles seulement si non connecté) */}
-              <Route
-                path="/login"
-                element={
-                  <PublicRoute>
-                    <Login />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/register"
-                element={
-                  <PublicRoute>
-                    <Register />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/reset-password"
-                element={
-                  <PublicRoute>
-                    <ResetPasswordRequest />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/reset-password/:token"
-                element={
-                  <PublicRoute>
-                    <ResetPassword />
-                  </PublicRoute>
-                }
-              />
+                {/* Routes d'authentification (accessibles seulement si non connecté) */}
+                <Route
+                  path="/login"
+                  element={
+                    <PublicRoute>
+                      <Login />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/register"
+                  element={
+                    <PublicRoute>
+                      <Register />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/reset-password"
+                  element={
+                    <PublicRoute>
+                      <ResetPasswordRequest />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/reset-password/:token"
+                  element={
+                    <PublicRoute>
+                      <ResetPassword />
+                    </PublicRoute>
+                  }
+                />
 
-              {/* Routes privées (nécessitent une authentification) */}
-              <Route
-                path="/profile"
-                element={
-                  <PrivateRoute>
-                    <Profile />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/create-product"
-                element={
-                  <PrivateRoute roles={["seller", "admin"]}>
-                    {/* <CreateProduct /> */}
-                    <CreateProductWizard />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/payment/:auctionId"
-                element={
-                  <PrivateRoute>
-                    <PaymentPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/payment/:paymentId/status"
-                element={
-                  <PrivateRoute>
-                    <PaymentStatus />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/messages"
-                element={
-                  <PrivateRoute>
-                    <MessagesPage />
-                  </PrivateRoute>
-                }
-              />
+                {/* Routes privées (nécessitent une authentification) */}
+                <Route
+                  path="/profile"
+                  element={
+                    <PrivateRoute>
+                      <Profile />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/create-product"
+                  element={
+                    <PrivateRoute roles={["seller", "admin"]}>
+                      {/* <CreateProduct /> */}
+                      <CreateProductWizard />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/payment/:auctionId"
+                  element={
+                    <PrivateRoute>
+                      <PaymentPage />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/payment/:paymentId/status"
+                  element={
+                    <PrivateRoute>
+                      <PaymentStatus />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/messages"
+                  element={
+                    <PrivateRoute>
+                      <MessagesPage />
+                    </PrivateRoute>
+                  }
+                />
 
-              {/* Routes administrateur */}
-              <Route
-                path="/admin"
-                element={
-                  <PrivateRoute roles={["admin"]}>
-                    <AdminDashboard />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin/auctions"
-                element={
-                  <PrivateRoute roles={["admin"]}>
-                    <AuctionManagement />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin/users"
-                element={
-                  <PrivateRoute roles={["admin"]}>
-                    <UserManagement />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin/reports"
-                element={
-                  <PrivateRoute roles={["admin"]}>
-                    <Reports />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin/settings"
-                element={
-                  <PrivateRoute roles={["admin"]}>
-                    <AdminSettings />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin/audit"
-                element={
-                  <PrivateRoute roles={["admin"]}>
-                    <AuditLogs />
-                  </PrivateRoute>
-                }
-              />
+                {/* Routes administrateur */}
+                <Route
+                  path="/admin"
+                  element={
+                    <PrivateRoute roles={["admin"]}>
+                      <AdminDashboard />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/admin/auctions"
+                  element={
+                    <PrivateRoute roles={["admin"]}>
+                      <AuctionManagement />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/admin/users"
+                  element={
+                    <PrivateRoute roles={["admin"]}>
+                      <UserManagement />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/admin/reports"
+                  element={
+                    <PrivateRoute roles={["admin"]}>
+                      <Reports />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/admin/settings"
+                  element={
+                    <PrivateRoute roles={["admin"]}>
+                      <AdminSettings />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/admin/audit"
+                  element={
+                    <PrivateRoute roles={["admin"]}>
+                      <AuditLogs />
+                    </PrivateRoute>
+                  }
+                />
 
-              {/* Page 404 */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </main>
-          <Footer />
-        </div>
-      </Router>
+                {/* Page 404 */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 4000,
+                  style: {
+                    background: "#363636",
+                    color: "#fff",
+                  },
+                }}
+              />
+            </main>
+            <Footer />
+          </div>
+        </Router>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

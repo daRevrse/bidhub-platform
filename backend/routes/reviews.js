@@ -55,7 +55,7 @@ router.get("/user/:userId", async (req, res) => {
         {
           model: Auction,
           as: "auction",
-          attributes: ["id", "endTime", "finalPrice"],
+          attributes: ["id", "endTime", "currentPrice"],
           required: false,
           include: [
             {
@@ -275,11 +275,9 @@ router.post("/", auth, async (req, res) => {
     });
 
     if (existingReview) {
-      return res
-        .status(400)
-        .json({
-          message: "Vous avez déjà donné un avis pour cette transaction",
-        });
+      return res.status(400).json({
+        message: "Vous avez déjà donné un avis pour cette transaction",
+      });
     }
 
     // Créer l'avis

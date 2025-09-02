@@ -4,6 +4,13 @@ const emailService = require("./emailService");
 const { Op } = require("sequelize");
 
 class NotificationService {
+  constructor() {
+    this.socketManager = null; // Sera assigné par le serveur
+  }
+
+  setSocketManager(socketManager) {
+    this.socketManager = socketManager;
+  }
   // Créer une notification
   async createNotification({
     userId,

@@ -13,6 +13,8 @@ const {
 const AuctionSocketManager = require("./socket/auctionSocket");
 const CronJobService = require("./services/cronJobs");
 const MessageSocketManager = require("./socket/messageSocket");
+const NotificationSocketManager = require("./socket/notificationSocket");
+const NotificationService = require("./services/notificationService");
 
 dotenv.config();
 
@@ -66,6 +68,7 @@ app.use(
 
 // Routes d'audit
 app.use("/api/admin/audit-logs", require("./routes/auditLogs"));
+app.use("/api/notifications", require("./routes/notifications"));
 
 // Route de test de santé
 app.get("/api/health", (req, res) => {
@@ -120,6 +123,9 @@ const createDefaultSettings = async () => {
 // Initialiser le gestionnaire de sockets
 const auctionSocketManager = new AuctionSocketManager(io);
 const messageSocketManager = new MessageSocketManager(io);
+
+const notificationSocketManager = new NotificationSocketManager(io);
+NotificationService.setSocketManager(notificationSocketManager);
 
 app.use((req, res, next) => {
   req.io = io;
