@@ -712,7 +712,263 @@ router.get("/recent-users", auth, adminAuth, async (req, res) => {
   }
 });
 
-// Routes déjà existantes (à conserver)
-// ... (toutes les routes existantes de l'ancien fichier admin.js)
+// À ajouter dans backend/routes/admin.js
+
+// @route   PUT /api/admin/users/:id/verify
+// @desc    Approuver ou rejeter une demande de vérification
+// @access  Private/Admin
+router.put("/users/:id/verify", auth, adminAuth, async (req, res) => {
+  try {
+    const { approve, reason } = req.body;
+    const userId = req.params.id;
+
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
+    }
+
+    if (approve) {
+      // Approuver la vérification
+      await user.update({
+        isVerified: true,
+        verificationRequested: false,
+        verificationApprovedAt: new Date(),
+        verificationApprovedBy: req.user.userId,
+      });
+
+      res.json({
+        message: "Utilisateur vérifié avec succès",
+        user: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          isVerified: user.isVerified,
+        },
+      });
+    } else {
+      // Rejeter la vérification
+      await user.update({
+        isVerified: false,
+        verificationRequested: false,
+        verificationRejectedAt: new Date(),
+        verificationRejectedBy: req.user.userId,
+        verificationRejectionReason: reason || "Non spécifié",
+      });
+
+      res.json({
+        message: "Demande de vérification rejetée",
+        user: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          isVerified: user.isVerified,
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Erreur traitement demande vérification:", error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+});
+
+// @route   GET /api/admin/verification-requests
+// @desc    Obtenir les demandes de vérification en attente
+// @access  Private/Admin
+router.get("/verification-requests", auth, adminAuth, async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const users = await User.findAndCountAll({
+      where: {
+        verificationRequested: true,
+        isVerified: false,
+      },
+      attributes: {
+        exclude: ["password", "resetPasswordToken"],
+      },
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [["verificationRequestedAt", "ASC"]], // Plus anciennes en premier
+    });
+
+    res.json({
+      requests: users.rows,
+      totalPages: Math.ceil(users.count / limit),
+      currentPage: parseInt(page),
+      totalRequests: users.count,
+    });
+  } catch (error) {
+    console.error("Erreur récupération demandes vérification:", error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+});
+
+// @route   PUT /api/admin/users/:id/status
+// @desc    Mettre à jour le statut d'un utilisateur
+// @access  Private/Admin
+router.put("/users/:id/status", auth, adminAuth, async (req, res) => {
+  try {
+    const { isVerified, role, isActive } = req.body;
+    const userId = req.params.id;
+
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
+    }
+
+    const updates = {};
+    if (typeof isVerified === "boolean") updates.isVerified = isVerified;
+    if (role && ["user", "seller", "admin"].includes(role)) updates.role = role;
+    if (typeof isActive === "boolean") updates.isActive = isActive;
+
+    await user.update(updates);
+
+    res.json({
+      message: "Statut utilisateur mis à jour",
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        isVerified: user.isVerified,
+        isActive: user.isActive,
+      },
+    });
+  } catch (error) {
+    console.error("Erreur mise à jour utilisateur:", error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+});
+
+// @route   GET /api/admin/user/:id/details
+// @desc    Obtenir les détails complets d'un utilisateur
+// @access  Private/Admin
+router.get("/user/:id/details", auth, adminAuth, async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const user = await User.findByPk(userId, {
+      attributes: { exclude: ["password"] },
+      include: [
+        {
+          model: Product,
+          as: "products",
+          required: false,
+          include: [
+            {
+              model: Auction,
+              as: "auction",
+              required: false,
+            },
+          ],
+        },
+        {
+          model: Bid,
+          as: "bids",
+          required: false,
+          include: [
+            {
+              model: Auction,
+              as: "auction",
+              required: false,
+              include: [
+                {
+                  model: Product,
+                  as: "product",
+                  required: false,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.error("Erreur récupération détails utilisateur:", error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+});
+
+// @route   POST /api/admin/users/bulk-action
+// @desc    Actions en lot sur les utilisateurs
+// @access  Private/Admin
+router.post("/users/bulk-action", auth, adminAuth, async (req, res) => {
+  try {
+    const { userIds, action, value } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ message: "Liste d'utilisateurs requise" });
+    }
+
+    let updateData = {};
+    let message = "";
+
+    switch (action) {
+      case "verify":
+        updateData = {
+          isVerified: true,
+          verificationRequested: false,
+          verificationApprovedAt: new Date(),
+          verificationApprovedBy: req.user.userId,
+        };
+        message = `${userIds.length} utilisateur(s) vérifié(s)`;
+        break;
+      case "unverify":
+        updateData = { isVerified: false };
+        message = `${userIds.length} utilisateur(s) non vérifié(s)`;
+        break;
+      case "activate":
+        updateData = { isActive: true };
+        message = `${userIds.length} utilisateur(s) activé(s)`;
+        break;
+      case "deactivate":
+        updateData = { isActive: false };
+        message = `${userIds.length} utilisateur(s) désactivé(s)`;
+        break;
+      default:
+        return res.status(400).json({ message: "Action non valide" });
+    }
+
+    // Ne pas permettre d'actions sur les admins
+    const usersToUpdate = await User.findAll({
+      where: {
+        id: { [Op.in]: userIds },
+        role: { [Op.ne]: "admin" },
+      },
+      attributes: ["id"],
+    });
+
+    if (usersToUpdate.length === 0) {
+      return res.status(400).json({
+        message: "Aucun utilisateur valide à modifier",
+      });
+    }
+
+    const validUserIds = usersToUpdate.map((u) => u.id);
+
+    await User.update(updateData, {
+      where: { id: { [Op.in]: validUserIds } },
+    });
+
+    res.json({
+      message: `${validUserIds.length} utilisateur(s) modifié(s)`,
+      processedCount: validUserIds.length,
+      skippedCount: userIds.length - validUserIds.length,
+    });
+  } catch (error) {
+    console.error("Erreur action en lot:", error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+});
 
 module.exports = router;

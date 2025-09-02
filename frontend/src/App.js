@@ -69,7 +69,7 @@ function App() {
               {/* <Route path="/blog" element={<Blog />} /> */}
               {/* <Route path="/careers" element={<Careers />} /> */}
               {/* <Route path="/press" element={<Press />} /> */}
-              <Route path="/report" element={<Reports />} />
+              {/* <Route path="/report" element={<Report />} /> */}
 
               {/* Pages légales */}
               <Route path="/terms" element={<Terms />} />

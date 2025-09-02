@@ -1,4 +1,4 @@
-// backend/server.js - MISE À JOUR AVEC AUDIT
+// backend/server.js - VERSION MISE À JOUR AVEC ROUTES STATS
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -37,7 +37,7 @@ app.use("/uploads/messages", express.static("uploads/messages"));
 // Middleware d'audit pour toutes les requêtes
 app.use(
   auditMiddleware({
-    excludePaths: ["/api/health", "/uploads", "/socket.io"],
+    excludePaths: ["/api/health", "/uploads", "/socket.io", "/api/stats"],
     severity: "low",
   })
 );
@@ -51,6 +51,9 @@ app.use("/api/payments", require("./routes/payments"));
 app.use("/api/reviews", require("./routes/reviews"));
 app.use("/api/messages", require("./routes/messages"));
 
+// Nouvelle route statistiques (publique)
+app.use("/api/stats", require("./routes/stats"));
+
 // Routes d'administration avec audit critique
 app.use(
   "/api/admin",
@@ -61,7 +64,7 @@ app.use(
   require("./routes/admin")
 );
 
-// Nouvelles routes d'audit
+// Routes d'audit
 app.use("/api/admin/audit-logs", require("./routes/auditLogs"));
 
 // Route de test de santé
@@ -71,8 +74,48 @@ app.get("/api/health", (req, res) => {
     timestamp: new Date().toISOString(),
     status: "OK",
     version: "2.0.0",
+    features: {
+      auctions: "active",
+      payments: "active",
+      messaging: "active",
+      admin: "active",
+      stats: "active",
+      realtime: "active",
+    },
   });
 });
+
+// Fonction pour créer les paramètres par défaut
+const createDefaultSettings = async () => {
+  try {
+    const { Setting } = require("./models");
+
+    const defaultSettings = [
+      { key: "site_name", value: "BidHub", category: "general" },
+      {
+        key: "site_description",
+        value: "Plateforme d'enchères en ligne au Togo",
+        category: "general",
+      },
+      { key: "commission_rate", value: "5", category: "financial" },
+      { key: "min_bid_increment", value: "500", category: "auctions" },
+      { key: "max_auction_duration", value: "30", category: "auctions" },
+      { key: "email_notifications", value: "true", category: "notifications" },
+      { key: "sms_notifications", value: "true", category: "notifications" },
+    ];
+
+    for (const setting of defaultSettings) {
+      await Setting.findOrCreate({
+        where: { key: setting.key },
+        defaults: setting,
+      });
+    }
+
+    console.log("✅ Default settings created/verified");
+  } catch (error) {
+    console.error("❌ Error creating default settings:", error);
+  }
+};
 
 // Initialiser le gestionnaire de sockets
 const auctionSocketManager = new AuctionSocketManager(io);
@@ -107,6 +150,7 @@ const startServer = async () => {
         port: PORT,
         nodeVersion: process.version,
         environment: process.env.NODE_ENV || "development",
+        features: ["auctions", "stats", "realtime", "admin", "audit"],
       },
       severity: "medium",
     });
@@ -120,6 +164,8 @@ const startServer = async () => {
       console.log(`⏰ Cron jobs active for auction management`);
       console.log(`📧 Email notifications enabled`);
       console.log(`📊 Audit system active`);
+      console.log(`📈 Stats API available at /api/stats`);
+      console.log(`🌍 Health check: http://localhost:${PORT}/api/health`);
     });
   } catch (error) {
     console.error("❌ Unable to start server:", error);
@@ -133,215 +179,24 @@ const startServer = async () => {
       success: false,
       errorMessage: error.message,
     });
+
+    process.exit(1);
   }
 };
 
-// Fonction pour créer les paramètres par défaut
-const createDefaultSettings = async () => {
-  const { Setting } = require("./models");
-
-  const defaultSettings = [
-    // Paramètres généraux
-    { category: "general", key: "siteName", value: "BidHub", type: "string" },
-    {
-      category: "general",
-      key: "siteDescription",
-      value: "Plateforme d'enchères en ligne au Togo",
-      type: "string",
-    },
-    {
-      category: "general",
-      key: "contactEmail",
-      value: "contact@bidhub.tg",
-      type: "string",
-    },
-    {
-      category: "general",
-      key: "supportEmail",
-      value: "support@bidhub.tg",
-      type: "string",
-    },
-    {
-      category: "general",
-      key: "maintenanceMode",
-      value: "false",
-      type: "boolean",
-    },
-    {
-      category: "general",
-      key: "registrationEnabled",
-      value: "true",
-      type: "boolean",
-    },
-
-    // Paramètres d'enchères
-    {
-      category: "auction",
-      key: "minBidIncrement",
-      value: "100",
-      type: "number",
-    },
-    {
-      category: "auction",
-      key: "maxAuctionDuration",
-      value: "30",
-      type: "number",
-    },
-    { category: "auction", key: "commissionRate", value: "10", type: "number" },
-    {
-      category: "auction",
-      key: "autoExtendTime",
-      value: "300",
-      type: "number",
-    },
-    {
-      category: "auction",
-      key: "maxImagesPerProduct",
-      value: "5",
-      type: "number",
-    },
-    {
-      category: "auction",
-      key: "bidderVerificationRequired",
-      value: "false",
-      type: "boolean",
-    },
-
-    // Paramètres de paiement
-    {
-      category: "payment",
-      key: "floozEnabled",
-      value: "true",
-      type: "boolean",
-    },
-    {
-      category: "payment",
-      key: "tmoneyEnabled",
-      value: "true",
-      type: "boolean",
-    },
-    {
-      category: "payment",
-      key: "minPaymentAmount",
-      value: "500",
-      type: "number",
-    },
-    {
-      category: "payment",
-      key: "maxPaymentAmount",
-      value: "5000000",
-      type: "number",
-    },
-    {
-      category: "payment",
-      key: "paymentTimeout",
-      value: "600",
-      type: "number",
-    },
-    {
-      category: "payment",
-      key: "autoRefundEnabled",
-      value: "true",
-      type: "boolean",
-    },
-
-    // Paramètres de notifications
-    {
-      category: "notification",
-      key: "emailNotificationsEnabled",
-      value: "true",
-      type: "boolean",
-    },
-    {
-      category: "notification",
-      key: "smsNotificationsEnabled",
-      value: "false",
-      type: "boolean",
-    },
-    {
-      category: "notification",
-      key: "auctionEndReminder",
-      value: "3600",
-      type: "number",
-    },
-    {
-      category: "notification",
-      key: "bidNotifications",
-      value: "true",
-      type: "boolean",
-    },
-    {
-      category: "notification",
-      key: "systemNotifications",
-      value: "true",
-      type: "boolean",
-    },
-
-    // Paramètres de sécurité
-    {
-      category: "security",
-      key: "maxLoginAttempts",
-      value: "5",
-      type: "number",
-    },
-    {
-      category: "security",
-      key: "accountLockoutDuration",
-      value: "1800",
-      type: "number",
-    },
-    {
-      category: "security",
-      key: "passwordMinLength",
-      value: "8",
-      type: "number",
-    },
-    {
-      category: "security",
-      key: "requireEmailVerification",
-      value: "true",
-      type: "boolean",
-    },
-    {
-      category: "security",
-      key: "twoFactorEnabled",
-      value: "false",
-      type: "boolean",
-    },
-    {
-      category: "security",
-      key: "sessionTimeout",
-      value: "7200",
-      type: "number",
-    },
-  ];
-
-  for (const setting of defaultSettings) {
-    await Setting.findOrCreate({
-      where: { category: setting.category, key: setting.key },
-      defaults: setting,
-    });
-  }
-
-  console.log("✅ Default settings created/verified");
-};
-
-// Gestion propre de l'arrêt du serveur
+// Gestion gracieuse de l'arrêt du serveur
 process.on("SIGTERM", async () => {
   console.log("🛑 SIGTERM received, shutting down gracefully");
 
   await AuditService.log({
     action: "SERVER_SHUTDOWN",
     entity: "System",
-    details: { signal: "SIGTERM" },
+    details: { reason: "SIGTERM" },
     severity: "medium",
   });
 
-  if (cronJobService) {
-    cronJobService.stopAllJobs();
-  }
   server.close(() => {
-    console.log("✅ Server closed");
+    console.log("✅ Server closed successfully");
     process.exit(0);
   });
 });
@@ -352,15 +207,12 @@ process.on("SIGINT", async () => {
   await AuditService.log({
     action: "SERVER_SHUTDOWN",
     entity: "System",
-    details: { signal: "SIGINT" },
+    details: { reason: "SIGINT" },
     severity: "medium",
   });
 
-  if (cronJobService) {
-    cronJobService.stopAllJobs();
-  }
   server.close(() => {
-    console.log("✅ Server closed");
+    console.log("✅ Server closed successfully");
     process.exit(0);
   });
 });
@@ -372,7 +224,10 @@ process.on("uncaughtException", async (error) => {
   await AuditService.log({
     action: "UNCAUGHT_EXCEPTION",
     entity: "System",
-    details: { error: error.message, stack: error.stack },
+    details: {
+      error: error.message,
+      stack: error.stack,
+    },
     severity: "critical",
     success: false,
     errorMessage: error.message,
@@ -387,11 +242,17 @@ process.on("unhandledRejection", async (reason, promise) => {
   await AuditService.log({
     action: "UNHANDLED_REJECTION",
     entity: "System",
-    details: { reason: reason?.message || reason, promise: promise.toString() },
+    details: {
+      reason: reason?.toString(),
+      promise: promise?.toString(),
+    },
     severity: "critical",
     success: false,
-    errorMessage: reason?.message || "Unhandled promise rejection",
+    errorMessage: reason?.toString(),
   });
 });
 
+// Démarrer le serveur
 startServer();
+
+module.exports = app;
