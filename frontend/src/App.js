@@ -1,3 +1,4 @@
+// frontend/src/App.js - VERSION MISE À JOUR avec toutes les nouvelles routes
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "./components/layout/Navbar";
@@ -25,6 +26,22 @@ import Reports from "./components/admin/Reports";
 import UserManagement from "./components/admin/UserManagement";
 import AdminSettings from "./components/admin/AdminSettings";
 import AuditLogs from "./components/admin/AuditLogs";
+import HowItWorks from "./pages/info/HowItWorks";
+import About from "./pages/info/About";
+import Contact from "./pages/info/Contact";
+// import Categories from "./pages/info/Categories";
+// import BecomeSeller from "./pages/info/BecomeSeller";
+import FAQ from "./pages/info/FAQ";
+// import Help from "./pages/info/Help";
+// import Blog from "./pages/info/Blog";
+// import Careers from "./pages/info/Careers";
+// import Terms from "./pages/info/Terms";
+// import Privacy from "./pages/info/Privacy";
+// import Cookies from "./pages/info/Cookies";
+import Legal from "./pages/legal/Legal";
+import Terms from "./pages/legal/Terms";
+import Privacy from "./pages/legal/Privacy";
+import Cookies from "./pages/legal/Cookies";
 
 function App() {
   return (
@@ -34,7 +51,7 @@ function App() {
           <Navbar />
           <main className="flex-grow">
             <Routes>
-              {/* Routes publiques */}
+              {/* Routes publiques principales */}
               <Route path="/" element={<Home />} />
               <Route path="/auctions" element={<AuctionList />} />
               <Route path="/auction/:id" element={<AuctionDetails />} />
@@ -45,8 +62,20 @@ function App() {
               <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
+              {/* <Route path="/categories" element={<Categories />} /> */}
+              {/* <Route path="/become-seller" element={<BecomeSeller />} /> */}
+              <Route path="/faq" element={<FAQ />} />
+              {/* <Route path="/help" element={<Help />} /> */}
+              {/* <Route path="/blog" element={<Blog />} /> */}
+              {/* <Route path="/careers" element={<Careers />} /> */}
+              {/* <Route path="/press" element={<Press />} /> */}
+              <Route path="/report" element={<Reports />} />
+
+              {/* Pages légales */}
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
+              <Route path="/legal" element={<Legal />} />
+              <Route path="/cookies" element={<Cookies />} />
 
               {/* Routes d'authentification (accessibles seulement si non connecté) */}
               <Route
@@ -124,7 +153,7 @@ function App() {
                 }
               />
 
-              {/* Routes d'administration (admin seulement) */}
+              {/* Routes administrateur */}
               <Route
                 path="/admin"
                 element={
@@ -134,10 +163,10 @@ function App() {
                 }
               />
               <Route
-                path="/admin/dashboard"
+                path="/admin/auctions"
                 element={
                   <PrivateRoute roles={["admin"]}>
-                    <AdminDashboard />
+                    <AuctionManagement />
                   </PrivateRoute>
                 }
               />
@@ -146,14 +175,6 @@ function App() {
                 element={
                   <PrivateRoute roles={["admin"]}>
                     <UserManagement />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin/auctions"
-                element={
-                  <PrivateRoute roles={["admin"]}>
-                    <AuctionManagement />
                   </PrivateRoute>
                 }
               />
@@ -173,9 +194,8 @@ function App() {
                   </PrivateRoute>
                 }
               />
-
               <Route
-                path="/admin/logs"
+                path="/admin/audit"
                 element={
                   <PrivateRoute roles={["admin"]}>
                     <AuditLogs />
@@ -183,7 +203,7 @@ function App() {
                 }
               />
 
-              {/* Route 404 */}
+              {/* Page 404 */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
@@ -193,136 +213,6 @@ function App() {
     </AuthProvider>
   );
 }
-
-// Composants de pages temporaires (à créer)
-const HowItWorks = () => (
-  <div className="max-w-4xl mx-auto px-4 py-12">
-    <h1 className="text-3xl font-bold text-gray-900 mb-8">Comment ça marche</h1>
-    <div className="prose max-w-none">
-      <p>Guide d'utilisation de BidHub...</p>
-    </div>
-  </div>
-);
-
-const About = () => (
-  <div className="max-w-4xl mx-auto px-4 py-12">
-    <h1 className="text-3xl font-bold text-gray-900 mb-8">
-      À propos de BidHub
-    </h1>
-    <div className="prose max-w-none">
-      <p>BidHub est la première plateforme d'enchères en ligne au Togo...</p>
-    </div>
-  </div>
-);
-
-const Contact = () => (
-  <div className="max-w-4xl mx-auto px-4 py-12">
-    <h1 className="text-3xl font-bold text-gray-900 mb-8">Contactez-nous</h1>
-    <div className="grid md:grid-cols-2 gap-8">
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Informations de contact</h2>
-        <div className="space-y-3">
-          <p>📧 contact@bidhub.tg</p>
-          <p>📞 +228 90 00 00 00</p>
-          <p>📍 Lomé, Togo</p>
-        </div>
-      </div>
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Formulaire de contact</h2>
-        <form className="space-y-4">
-          <input
-            type="text"
-            placeholder="Votre nom"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="email"
-            placeholder="Votre email"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <textarea
-            placeholder="Votre message"
-            rows="4"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          ></textarea>
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Envoyer
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-);
-
-const Terms = () => (
-  <div className="max-w-4xl mx-auto px-4 py-12">
-    <h1 className="text-3xl font-bold text-gray-900 mb-8">
-      Conditions d'utilisation
-    </h1>
-    <div className="prose max-w-none">
-      <p>Conditions d'utilisation de BidHub...</p>
-    </div>
-  </div>
-);
-
-const Privacy = () => (
-  <div className="max-w-4xl mx-auto px-4 py-12">
-    <h1 className="text-3xl font-bold text-gray-900 mb-8">
-      Politique de confidentialité
-    </h1>
-    <div className="prose max-w-none">
-      <p>Politique de confidentialité de BidHub...</p>
-    </div>
-  </div>
-);
-
-// Composants d'administration temporaires
-// const UserManagement = () => (
-//   <div className="max-w-7xl mx-auto px-4 py-8">
-//     <h1 className="text-3xl font-bold text-gray-900 mb-8">
-//       Gestion des utilisateurs
-//     </h1>
-//     <div className="bg-white rounded-lg shadow p-6">
-//       <p>Interface de gestion des utilisateurs à venir...</p>
-//     </div>
-//   </div>
-// );
-
-// const AuctionManagement = () => (
-//   <div className="max-w-7xl mx-auto px-4 py-8">
-//     <h1 className="text-3xl font-bold text-gray-900 mb-8">
-//       Gestion des enchères
-//     </h1>
-//     <div className="bg-white rounded-lg shadow p-6">
-//       <p>Interface de gestion des enchères à venir...</p>
-//     </div>
-//   </div>
-// );
-
-// const Reports = () => (
-//   <div className="max-w-7xl mx-auto px-4 py-8">
-//     <h1 className="text-3xl font-bold text-gray-900 mb-8">
-//       Rapports et analyses
-//     </h1>
-//     <div className="bg-white rounded-lg shadow p-6">
-//       <p>Interface de rapports à venir...</p>
-//     </div>
-//   </div>
-// );
-
-// const AdminSettings = () => (
-//   <div className="max-w-7xl mx-auto px-4 py-8">
-//     <h1 className="text-3xl font-bold text-gray-900 mb-8">
-//       Paramètres administrateur
-//     </h1>
-//     <div className="bg-white rounded-lg shadow p-6">
-//       <p>Interface de paramètres à venir...</p>
-//     </div>
-//   </div>
-// );
 
 // Composant pour la page 404
 const NotFound = () => {
@@ -339,19 +229,34 @@ const NotFound = () => {
         <p className="text-gray-600 mb-8">
           Désolé, la page que vous recherchez n'existe pas ou a été déplacée.
         </p>
-        <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <a
             href="/"
-            className="inline-flex items-center justify-center w-full px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 transform hover:scale-105"
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg transform hover:scale-105"
           >
             Retour à l'accueil
           </a>
           <a
             href="/auctions"
-            className="inline-flex items-center justify-center w-full px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+            className="px-6 py-3 border-2 border-blue-600 text-blue-600 font-semibold rounded-xl hover:bg-blue-600 hover:text-white transition-all duration-200"
           >
             Voir les enchères
           </a>
+        </div>
+
+        {/* Crédit GCSGC Agency */}
+        <div className="mt-12 pt-8 border-t border-gray-200">
+          <p className="text-sm text-gray-500">
+            BidHub - Une création{" "}
+            <a
+              href="https://darevrse.github.io/site-gcsgc-agency/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-orange-600 hover:text-orange-700 transition-colors"
+            >
+              GCSGC Agency
+            </a>
+          </p>
         </div>
       </div>
     </div>

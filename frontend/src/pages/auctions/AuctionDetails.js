@@ -77,7 +77,6 @@ const AuctionDetails = () => {
   useEffect(() => {
     if (id) {
       fetchAuctionDetails();
-      fetchSellerInfo();
       fetchRelatedAuctions();
     }
   }, [id]);
@@ -110,6 +109,8 @@ const AuctionDetails = () => {
       setCurrentPrice(auctionData.currentPrice);
       setBidHistory(auctionData.bids || []);
 
+      fetchSellerInfo(auctionData);
+
       // Marquer comme vu
       if (user) {
         markAsViewed();
@@ -126,7 +127,7 @@ const AuctionDetails = () => {
     }
   };
 
-  const fetchSellerInfo = async () => {
+  const fetchSellerInfo = async (auction) => {
     try {
       const response = await axios.get(
         `http://localhost:5000/api/users/${auction?.product?.sellerId}/profile`

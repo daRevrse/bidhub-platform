@@ -617,50 +617,62 @@ const Profile = () => {
           <h2 className="text-xl font-semibold text-gray-900 mb-6">
             Mes produits en vente
           </h2>
-          {profile?.products && profile.products.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {profile.products.map((product) => (
-                <div
-                  key={product.id}
-                  className="border rounded-xl p-4 hover:shadow-md transition-shadow"
-                >
-                  {product.images && product.images[0] && (
-                    <img
-                      src={product.images[0]}
-                      alt={product.title}
-                      className="w-full h-48 object-cover rounded-lg mb-4"
-                    />
-                  )}
-                  <h3 className="font-medium text-gray-900 mb-2">
-                    {product.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                    {product.description}
-                  </p>
-                  <div className="flex justify-between items-center">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        product.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {product.status === "active" ? "Actif" : "Inactif"}
-                    </span>
-                    {product.auction && (
-                      <span className="font-semibold text-blue-600">
-                        {formatPrice(product.auction.currentPrice)}
-                      </span>
+
+          {user?.role === "seller" ? (
+            profile?.products && profile.products.length > 0 ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {profile.products.map((product) => (
+                  <div
+                    key={product.id}
+                    className="border rounded-xl p-4 hover:shadow-md transition-shadow"
+                  >
+                    {product.images && product.images[0] && (
+                      <img
+                        src={`http://localhost:5000/uploads/products/${product.images[0]}`}
+                        alt={product.title}
+                        className="w-full h-48 object-cover rounded-lg mb-4"
+                      />
                     )}
+                    <h3 className="font-medium text-gray-900 mb-2">
+                      {product.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                      {product.description}
+                    </p>
+                    <div className="flex justify-between items-center">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          product.status === "active"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {product.status === "active" ? "Actif" : "Inactif"}
+                      </span>
+                      {product.auction && (
+                        <span className="font-semibold text-blue-600">
+                          {formatPrice(product.auction.currentPrice)}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <UserCircleIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 mb-4">Aucun produit en vente</p>
+                <button className="btn-primary">Ajouter un produit</button>
+              </div>
+            )
           ) : (
             <div className="text-center py-12">
               <UserCircleIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 mb-4">Aucun produit en vente</p>
-              <button className="btn-primary">Ajouter un produit</button>
+              <p className="text-gray-500 mb-4">
+                Vous n’êtes pas encore vendeur. Rejoignez la communauté et
+                commencez à vendre vos produits.
+              </p>
+              <button className="btn-primary">Devenir vendeur</button>
             </div>
           )}
         </div>
