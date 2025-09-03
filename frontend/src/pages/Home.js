@@ -44,12 +44,14 @@ const Home = () => {
     try {
       // Charger les enchères populaires
       const auctionsResponse = await axios.get(
-        "/api/auctions?status=active&limit=6&featured=true"
+        "http://localhost:5000/api/auctions?status=active&limit=6&featured=true"
       );
       setFeaturedAuctions(auctionsResponse.data.auctions || []);
 
       // Charger les statistiques
-      const statsResponse = await axios.get("/api/stats/home");
+      const statsResponse = await axios.get(
+        "http://localhost:5000/api/stats/home"
+      );
       setStats(statsResponse.data || stats);
 
       // Témoignages statiques (ou depuis API)

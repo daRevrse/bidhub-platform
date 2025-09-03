@@ -1,35 +1,100 @@
-import React, { useState, useEffect } from "react";
+// frontend/src/components/messaging/MessageNotification.js - VERSION AMÉLIORÉE
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { BellIcon, ChatBubbleLeftRightIcon } from "@heroicons/react/24/outline";
-import { BellIcon as BellSolidIcon } from "@heroicons/react/24/solid";
+import { useSocket } from "../../hooks/useSocket";
+import {
+  ChatBubbleLeftRightIcon,
+  ChatBubbleOvalLeftIcon,
+  UserCircleIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
+import { ChatBubbleLeftRightIcon as ChatSolidIcon } from "@heroicons/react/24/solid";
 import axios from "axios";
 
 const MessageNotification = () => {
   const { user } = useAuth();
+  const socket = useSocket();
   const [unreadCount, setUnreadCount] = useState(0);
   const [recentMessages, setRecentMessages] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Configuration axios
+  const api = axios.create({
+    baseURL: process.env.REACT_APP_API_URL || "http://localhost:5000",
+  });
+
+  // Intercepteur pour ajouter le token
+  api.interceptors.request.use((config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  });
 
   useEffect(() => {
     if (user) {
-      fetchUnreadMessages();
-      // Actualiser les messages toutes les 30 secondes
-      const interval = setInterval(fetchUnreadMessages, 30000);
+      fetchUnreadCount();
+      setupSocketListeners();
+
+      // Actualiser périodiquement
+      const interval = setInterval(fetchUnreadCount, 60000); // 1 minute
       return () => clearInterval(interval);
     }
-  }, [user]);
+  }, [user, socket]);
 
-  const fetchUnreadMessages = async () => {
+  // Fermer le dropdown en cliquant à l'extérieur
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const setupSocketListeners = () => {
+    if (!socket) return;
+
+    const handleNewMessage = (message) => {
+      console.log("💬 Nouveau message reçu:", message);
+      fetchUnreadCount();
+
+      // Si le dropdown est ouvert, actualiser les messages récents
+      if (isOpen) {
+        loadRecentMessages();
+      }
+    };
+
+    const handleMessagesRead = (data) => {
+      console.log("💬 Messages marqués comme lus:", data);
+      fetchUnreadCount();
+
+      if (isOpen) {
+        loadRecentMessages();
+      }
+    };
+
+    socket.on("new_message", handleNewMessage);
+    socket.on("messages_read", handleMessagesRead);
+
+    return () => {
+      socket.off("new_message", handleNewMessage);
+      socket.off("messages_read", handleMessagesRead);
+    };
+  };
+
+  const fetchUnreadCount = async () => {
     try {
-      const response = await axios.get(
-        "http://localhost:5000/api/messages/unread-count"
-      );
+      const response = await api.get("/api/messages/unread-count");
       setUnreadCount(response.data.unreadCount || 0);
-      setRecentMessages(response.data.recentMessages || []);
     } catch (error) {
-      console.error("Erreur récupération messages:", error);
+      console.error("Erreur récupération count messages:", error);
     }
   };
 
@@ -38,10 +103,23 @@ const MessageNotification = () => {
 
     setLoading(true);
     try {
-      const response = await axios.get(
-        "http://localhost:5000/api/messages/recent?limit=5"
-      );
-      setRecentMessages(response.data.messages || []);
+      const response = await api.get("/api/messages/conversations", {
+        params: { limit: 5, page: 1 },
+      });
+
+      // Extraire les derniers messages de chaque conversation
+      const conversations = response.data.conversations.conversations || [];
+      const recentMessagesData = conversations
+        .filter((conv) => conv.lastMessage)
+        .map((conv) => ({
+          ...conv.lastMessage,
+          conversationId: conv.id,
+          otherParticipant: conv.otherParticipant,
+          unreadCount: conv.unreadCount || 0,
+        }))
+        .slice(0, 5);
+
+      setRecentMessages(recentMessagesData);
     } catch (error) {
       console.error("Erreur récupération messages récents:", error);
     } finally {
@@ -50,7 +128,7 @@ const MessageNotification = () => {
   };
 
   const handleToggleDropdown = () => {
-    if (!isOpen && recentMessages.length === 0) {
+    if (!isOpen) {
       loadRecentMessages();
     }
     setIsOpen(!isOpen);
@@ -65,33 +143,51 @@ const MessageNotification = () => {
     const days = Math.floor(diff / 86400000);
 
     if (minutes < 1) return "À l'instant";
-    if (minutes < 60) return `${minutes}m`;
+    if (minutes < 60) return `${minutes}min`;
     if (hours < 24) return `${hours}h`;
-    return `${days}j`;
+    if (days < 7) return `${days}j`;
+    return date.toLocaleDateString("fr-FR");
   };
 
   const truncateMessage = (message, maxLength = 50) => {
+    if (!message) return "";
     if (message.length <= maxLength) return message;
     return message.substring(0, maxLength) + "...";
+  };
+
+  const getMessagePreview = (message) => {
+    switch (message.messageType) {
+      case "image":
+        return "📸 Image";
+      case "file":
+        return "📎 Fichier";
+      case "system":
+        return "💬 Message système";
+      default:
+        return message.content || "Message";
+    }
   };
 
   if (!user) return null;
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <button
         onClick={handleToggleDropdown}
-        className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 group"
+        className="relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 group focus:outline-none focus:ring-2 focus:ring-blue-500"
+        aria-label={`Messages ${
+          unreadCount > 0 ? `(${unreadCount} non lus)` : ""
+        }`}
       >
         {unreadCount > 0 ? (
-          <ChatBubbleLeftRightIcon className="w-6 h-6 text-blue-600" />
+          <ChatSolidIcon className="w-6 h-6 text-blue-600" />
         ) : (
-          <ChatBubbleLeftRightIcon className="w-6 h-6 text-gray-600 group-hover:text-blue-600" />
+          <ChatBubbleLeftRightIcon className="w-6 h-6 text-gray-600 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300" />
         )}
 
-        {/* Badge de notification */}
+        {/* Badge de messages non lus */}
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-medium animate-pulse">
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center animate-pulse">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
@@ -99,104 +195,152 @@ const MessageNotification = () => {
 
       {/* Dropdown des messages */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50 max-h-96 overflow-hidden">
-          {/* Header */}
-          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 rounded-t-xl">
-            <div className="flex items-center justify-between">
-              <h3 className="font-medium text-gray-900 flex items-center">
-                <ChatBubbleLeftRightIcon className="w-5 h-5 mr-2 text-blue-600" />
-                Messages
-              </h3>
-              {unreadCount > 0 && (
-                <span className="text-xs text-blue-600 font-medium">
-                  {unreadCount} non lu{unreadCount > 1 ? "s" : ""}
-                </span>
+        <>
+          <div className="absolute right-0 mt-3 w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl ring-1 ring-black/5 dark:ring-white/10 z-50 max-h-[32rem] overflow-hidden">
+            {/* Header */}
+            <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <ChatBubbleOvalLeftIcon className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Messages
+                  </h3>
+                  {unreadCount > 0 && (
+                    <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
+                      {unreadCount} nouveau{unreadCount > 1 ? "x" : ""}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="p-1 hover:bg-white/50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <XMarkIcon className="w-4 h-4 text-gray-500" />
+                </button>
+              </div>
+            </div>
+
+            {/* Liste des messages récents */}
+            <div className="overflow-y-auto max-h-80">
+              {loading ? (
+                <div className="p-8 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent mx-auto mb-3"></div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Chargement...
+                  </p>
+                </div>
+              ) : recentMessages.length > 0 ? (
+                recentMessages.map((message) => (
+                  <Link
+                    key={`${message.conversationId}-${message.id}`}
+                    to={`/messages?conversation=${message.conversationId}`}
+                    onClick={() => setIsOpen(false)}
+                    className="block p-4 border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 group"
+                  >
+                    <div className="flex items-start space-x-3">
+                      {/* Avatar */}
+                      <div className="flex-shrink-0">
+                        {message.otherParticipant?.avatar ? (
+                          <img
+                            src={`http://localhost:5000/uploads/avatars/${message.otherParticipant.avatar}`}
+                            alt={`${message.otherParticipant.firstName} ${message.otherParticipant.lastName}`}
+                            className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-600"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                            <span className="text-white text-sm font-semibold">
+                              {message.otherParticipant?.firstName?.[0] || "?"}
+                              {message.otherParticipant?.lastName?.[0] || ""}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Indicateur en ligne (placeholder) */}
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-white dark:border-gray-800 rounded-full"></div>
+                      </div>
+
+                      {/* Contenu du message */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                            {message.otherParticipant?.firstName}{" "}
+                            {message.otherParticipant?.lastName}
+                          </p>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                              {formatTime(message.createdAt)}
+                            </span>
+                            {message.unreadCount > 0 && (
+                              <span className="bg-blue-500 text-white text-xs font-bold rounded-full min-w-[18px] h-4 flex items-center justify-center">
+                                {message.unreadCount}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+                          {truncateMessage(getMessagePreview(message))}
+                        </p>
+
+                        {/* Statut du message */}
+                        <div className="flex items-center justify-between mt-2">
+                          <div className="flex items-center space-x-1">
+                            {message.messageType === "image" && (
+                              <span className="text-xs text-blue-500">📸</span>
+                            )}
+                            {message.messageType === "file" && (
+                              <span className="text-xs text-green-500">📎</span>
+                            )}
+                          </div>
+
+                          {message.senderId === user.id && (
+                            <div className="flex items-center text-xs text-gray-400">
+                              {message.isRead ? (
+                                <span className="text-blue-500">✓✓</span>
+                              ) : (
+                                <span>✓</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="p-8 text-center">
+                  <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <ChatBubbleLeftRightIcon className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                    Aucun message
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Vos conversations apparaîtront ici
+                  </p>
+                </div>
               )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+              <Link
+                to="/messages"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center justify-center w-full py-3 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200"
+              >
+                <ChatBubbleLeftRightIcon className="w-4 h-4 mr-2" />
+                Voir tous les messages
+              </Link>
             </div>
           </div>
 
-          {/* Liste des messages */}
-          <div className="max-h-72 overflow-y-auto">
-            {loading ? (
-              <div className="p-4 text-center">
-                <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
-                <p className="text-sm text-gray-500">Chargement...</p>
-              </div>
-            ) : recentMessages.length > 0 ? (
-              recentMessages.map((message) => (
-                <Link
-                  key={message.id}
-                  to={`/messages?conversation=${
-                    message.conversationId || message.senderId
-                  }`}
-                  className="block px-4 py-3 hover:bg-gray-50 transition-colors duration-200 border-b border-gray-100 last:border-b-0"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <div className="flex items-start space-x-3">
-                    {/* Avatar */}
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-                        <span className="text-white font-medium text-sm">
-                          {message.sender?.firstName?.[0] ||
-                            message.senderName?.[0] ||
-                            "?"}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Contenu du message */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {message.sender?.firstName} {message.sender?.lastName}
-                          {!message.sender && message.senderName}
-                        </p>
-                        <span className="text-xs text-gray-500 flex-shrink-0">
-                          {formatTime(message.createdAt)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600 line-clamp-2">
-                        {truncateMessage(message.content || message.text)}
-                      </p>
-                      {!message.isRead && (
-                        <div className="mt-1">
-                          <span className="inline-block w-2 h-2 bg-blue-600 rounded-full"></span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              <div className="p-8 text-center">
-                <ChatBubbleLeftRightIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm text-gray-500 mb-2">Aucun message</p>
-                <p className="text-xs text-gray-400">
-                  Vos conversations apparaîtront ici
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="border-t border-gray-100 bg-gray-50 rounded-b-xl">
-            <Link
-              to="/messages"
-              onClick={() => setIsOpen(false)}
-              className="block w-full text-center py-3 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-gray-100 transition-colors duration-200"
-            >
-              Voir tous les messages
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Overlay pour fermer le dropdown */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-transparent"
-          onClick={() => setIsOpen(false)}
-        />
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 z-40 bg-transparent"
+            onClick={() => setIsOpen(false)}
+          />
+        </>
       )}
     </div>
   );

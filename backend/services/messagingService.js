@@ -2,6 +2,13 @@ const { Conversation, Message, User, Auction, Product } = require("../models");
 const { Op } = require("sequelize");
 
 class MessagingService {
+  constructor() {
+    this.socketManager = null; // Sera assigné par le serveur
+  }
+
+  setSocketManager(socketManager) {
+    this.socketManager = socketManager;
+  }
   // Obtenir ou créer une conversation entre deux utilisateurs
   async getOrCreateConversation(userId1, userId2, auctionId = null) {
     try {
@@ -89,6 +96,50 @@ class MessagingService {
       return conversation;
     } catch (error) {
       throw new Error(`Erreur création conversation: ${error.message}`);
+    }
+  }
+
+  // Obtenir une conversation spécifique
+  async getConversation(conversationId, userId) {
+    try {
+      const conversation = await Conversation.findOne({
+        where: {
+          id: conversationId,
+          [Op.or]: [{ participant1Id: userId }, { participant2Id: userId }],
+        },
+        include: [
+          {
+            model: User,
+            as: "participant1",
+            attributes: ["id", "firstName", "lastName", "avatar"],
+          },
+          {
+            model: User,
+            as: "participant2",
+            attributes: ["id", "firstName", "lastName", "avatar"],
+          },
+          {
+            model: Auction,
+            as: "auction",
+            required: false,
+            include: [
+              {
+                model: Product,
+                as: "product",
+                attributes: ["id", "title", "images"],
+              },
+            ],
+          },
+        ],
+      });
+
+      if (!conversation) {
+        throw new Error("Conversation non trouvée");
+      }
+
+      return conversation;
+    } catch (error) {
+      throw new Error(`Erreur récupération conversation: ${error.message}`);
     }
   }
 
@@ -396,6 +447,58 @@ class MessagingService {
       return message;
     } catch (error) {
       throw new Error(`Erreur message système: ${error.message}`);
+    }
+  }
+
+  // Obtenir le nombre de messages non lus pour un utilisateur
+  // async getUnreadCount(userId) {
+  //   try {
+  //     const unreadCount = await Message.count({
+  //       where: {
+  //         isRead: false,
+  //       },
+  //       include: [
+  //         {
+  //           model: Conversation,
+  //           as: "conversation",
+  //           where: {
+  //             [Op.or]: [{ participant1Id: userId }, { participant2Id: userId }],
+  //           },
+  //           required: true,
+  //         },
+  //       ],
+  //     });
+
+  //     return unreadCount;
+  //   } catch (error) {
+  //     console.error("Erreur comptage messages non lus:", error);
+  //     return 0;
+  //   }
+  // }
+
+  async getUnreadCount(userId) {
+    try {
+      const unreadCount = await Message.count({
+        where: {
+          isRead: false,
+          senderId: { [Op.ne]: userId }, // exclure les messages envoyés par l'utilisateur
+        },
+        include: [
+          {
+            model: Conversation,
+            as: "conversation",
+            where: {
+              [Op.or]: [{ participant1Id: userId }, { participant2Id: userId }],
+            },
+            required: true,
+          },
+        ],
+      });
+
+      return unreadCount;
+    } catch (error) {
+      console.error("Erreur comptage messages non lus:", error);
+      return 0;
     }
   }
 }

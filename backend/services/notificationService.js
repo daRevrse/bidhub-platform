@@ -1,4 +1,4 @@
-// backend/services/notificationService.js
+// backend/services/notificationService.js - SERVICE COMPLET
 const { Notification, User } = require("../models");
 const emailService = require("./emailService");
 const { Op } = require("sequelize");
@@ -11,6 +11,7 @@ class NotificationService {
   setSocketManager(socketManager) {
     this.socketManager = socketManager;
   }
+
   // Créer une notification
   async createNotification({
     userId,
@@ -35,6 +36,11 @@ class NotificationService {
         imageUrl,
         expiresAt,
       });
+
+      // Envoyer en temps réel via Socket.io
+      if (this.socketManager) {
+        this.socketManager.sendNotificationToUser(userId, notification);
+      }
 
       // Envoyer email si nécessaire
       if (priority === "high" || priority === "urgent") {
@@ -232,16 +238,57 @@ class NotificationService {
 
   // Notification système
   async notifySystem(userIds, title, message, data = null) {
-    const notifications = userIds.map((userId) => ({
-      userId,
-      type: "system",
-      title,
-      message,
-      data,
-      priority: "medium",
-    }));
+    try {
+      const notifications = userIds.map((userId) => ({
+        userId,
+        type: "system",
+        title,
+        message,
+        data,
+        priority: "medium",
+      }));
 
-    await Notification.bulkCreate(notifications);
+      const createdNotifications = await Notification.bulkCreate(
+        notifications,
+        {
+          returning: true,
+        }
+      );
+
+      // Envoyer en temps réel
+      if (this.socketManager) {
+        createdNotifications.forEach((notification, index) => {
+          this.socketManager.sendNotificationToUser(
+            userIds[index],
+            notification
+          );
+        });
+      }
+    } catch (error) {
+      console.error("Erreur notification système:", error);
+    }
+  }
+
+  // Diffuser notification système à tous
+  async broadcastSystemNotification(title, message, data = null) {
+    try {
+      // Créer notification pour tous les utilisateurs
+      const users = await User.findAll({ attributes: ["id"] });
+      const userIds = users.map((user) => user.id);
+
+      await this.notifySystem(userIds, title, message, data);
+
+      // Diffuser via socket
+      if (this.socketManager) {
+        this.socketManager.broadcastSystemNotification({
+          title,
+          message,
+          data,
+        });
+      }
+    } catch (error) {
+      console.error("Erreur diffusion notification système:", error);
+    }
   }
 
   // Envoyer notification par email
@@ -296,6 +343,50 @@ class NotificationService {
     }
   }
 
+  // Marquer une notification comme lue
+  async markAsRead(userId, notificationId) {
+    try {
+      await Notification.update(
+        { isRead: true, readAt: new Date() },
+        {
+          where: {
+            id: notificationId,
+            userId,
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Erreur marquage notification:", error);
+    }
+  }
+
+  // Marquer toutes les notifications comme lues
+  async markAllAsRead(userId) {
+    try {
+      await Notification.update(
+        { isRead: true, readAt: new Date() },
+        { where: { userId, isRead: false } }
+      );
+    } catch (error) {
+      console.error("Erreur marquage toutes notifications:", error);
+    }
+  }
+
+  // Obtenir le nombre de notifications non lues
+  async getUnreadCount(userId) {
+    try {
+      return await Notification.count({
+        where: {
+          userId,
+          isRead: false,
+        },
+      });
+    } catch (error) {
+      console.error("Erreur comptage notifications:", error);
+      return 0;
+    }
+  }
+
   // Nettoyer les anciennes notifications
   async cleanupExpiredNotifications() {
     try {
@@ -320,33 +411,6 @@ class NotificationService {
       console.log(`🧹 ${result} notifications expirées supprimées`);
     } catch (error) {
       console.error("Erreur nettoyage notifications:", error);
-    }
-  }
-
-  // Obtenir le nombre de notifications non lues
-  async getUnreadCount(userId) {
-    try {
-      return await Notification.count({
-        where: {
-          userId,
-          isRead: false,
-        },
-      });
-    } catch (error) {
-      console.error("Erreur comptage notifications:", error);
-      return 0;
-    }
-  }
-
-  // Marquer toutes les notifications comme lues
-  async markAllAsRead(userId) {
-    try {
-      await Notification.update(
-        { isRead: true, readAt: new Date() },
-        { where: { userId, isRead: false } }
-      );
-    } catch (error) {
-      console.error("Erreur marquage toutes notifications:", error);
     }
   }
 }

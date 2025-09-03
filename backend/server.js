@@ -1,10 +1,10 @@
-// backend/server.js - VERSION MISE À JOUR AVEC ROUTES STATS
+// backend/server.js - VERSION CORRIGÉE AVEC SOCKET.IO
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
-const { sequelize } = require("./models");
+const { sequelize, Setting } = require("./models");
 const AuditService = require("./services/auditService");
 const {
   auditMiddleware,
@@ -14,7 +14,8 @@ const AuctionSocketManager = require("./socket/auctionSocket");
 const CronJobService = require("./services/cronJobs");
 const MessageSocketManager = require("./socket/messageSocket");
 const NotificationSocketManager = require("./socket/notificationSocket");
-const NotificationService = require("./services/notificationService");
+const notificationService = require("./services/notificationService");
+const messagingService = require("./services/messagingService");
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ const io = new Server(server, {
   cors: {
     origin: process.env.CLIENT_URL || "http://localhost:3000",
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
@@ -35,6 +37,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static("uploads"));
 app.use("/uploads/messages", express.static("uploads/messages"));
+
+// MIDDLEWARE POUR PASSER SOCKET.IO AUX ROUTES
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 
 // Middleware d'audit pour toutes les requêtes
 app.use(
@@ -75,36 +83,28 @@ app.get("/api/health", (req, res) => {
   res.json({
     message: "BidHub API is running!",
     timestamp: new Date().toISOString(),
-    status: "OK",
-    version: "2.0.0",
-    features: {
-      auctions: "active",
-      payments: "active",
-      messaging: "active",
-      admin: "active",
-      stats: "active",
-      realtime: "active",
-    },
+    version: "1.0.0",
+    status: "healthy",
   });
 });
+
+// INITIALISER LES GESTIONNAIRES SOCKET.IO
+const auctionSocketManager = new AuctionSocketManager(io);
+const messageSocketManager = new MessageSocketManager(io);
+const notificationSocketManager = new NotificationSocketManager(io);
+
+// CONNECTER LE SERVICE DE NOTIFICATION AU GESTIONNAIRE SOCKET
+notificationService.setSocketManager(notificationSocketManager);
+messagingService.setSocketManager(messageSocketManager);
 
 // Fonction pour créer les paramètres par défaut
 const createDefaultSettings = async () => {
   try {
-    const { Setting } = require("./models");
-
     const defaultSettings = [
-      { key: "site_name", value: "BidHub", category: "general" },
-      {
-        key: "site_description",
-        value: "Plateforme d'enchères en ligne au Togo",
-        category: "general",
-      },
-      { key: "commission_rate", value: "5", category: "financial" },
-      { key: "min_bid_increment", value: "500", category: "auctions" },
-      { key: "max_auction_duration", value: "30", category: "auctions" },
-      { key: "email_notifications", value: "true", category: "notifications" },
-      { key: "sms_notifications", value: "true", category: "notifications" },
+      { key: "site_name", value: "BidHub Togo", type: "string" },
+      { key: "auction_extension_time", value: "300", type: "number" },
+      { key: "max_bid_increment", value: "1000", type: "number" },
+      { key: "email_notifications", value: "true", type: "boolean" },
     ];
 
     for (const setting of defaultSettings) {
@@ -119,18 +119,6 @@ const createDefaultSettings = async () => {
     console.error("❌ Error creating default settings:", error);
   }
 };
-
-// Initialiser le gestionnaire de sockets
-const auctionSocketManager = new AuctionSocketManager(io);
-const messageSocketManager = new MessageSocketManager(io);
-
-const notificationSocketManager = new NotificationSocketManager(io);
-NotificationService.setSocketManager(notificationSocketManager);
-
-app.use((req, res, next) => {
-  req.io = io;
-  next();
-});
 
 // Initialiser les tâches automatisées
 let cronJobService;
@@ -166,9 +154,10 @@ const startServer = async () => {
 
     server.listen(PORT, () => {
       console.log(`🚀 BidHub server running on port ${PORT}`);
-      console.log(`🔌 Socket.io server ready for real-time auctions`);
+      console.log(`🔌 Socket.io server ready for real-time connections`);
+      console.log(`📧 Message system enabled with real-time notifications`);
+      console.log(`🔔 Notification system enabled with real-time updates`);
       console.log(`⏰ Cron jobs active for auction management`);
-      console.log(`📧 Email notifications enabled`);
       console.log(`📊 Audit system active`);
       console.log(`📈 Stats API available at /api/stats`);
       console.log(`🌍 Health check: http://localhost:${PORT}/api/health`);
@@ -183,82 +172,30 @@ const startServer = async () => {
       details: { error: error.message },
       severity: "critical",
       success: false,
-      errorMessage: error.message,
     });
 
     process.exit(1);
   }
 };
 
-// Gestion gracieuse de l'arrêt du serveur
-process.on("SIGTERM", async () => {
-  console.log("🛑 SIGTERM received, shutting down gracefully");
-
-  await AuditService.log({
-    action: "SERVER_SHUTDOWN",
-    entity: "System",
-    details: { reason: "SIGTERM" },
-    severity: "medium",
-  });
-
-  server.close(() => {
-    console.log("✅ Server closed successfully");
-    process.exit(0);
-  });
-});
-
+// Gestion de l'arrêt propre du serveur
 process.on("SIGINT", async () => {
-  console.log("🛑 SIGINT received, shutting down gracefully");
+  console.log("\n🔄 Shutting down gracefully...");
 
-  await AuditService.log({
-    action: "SERVER_SHUTDOWN",
-    entity: "System",
-    details: { reason: "SIGINT" },
-    severity: "medium",
-  });
+  // Arrêter les cron jobs
+  if (cronJobService) {
+    cronJobService.stopAllJobs();
+  }
 
-  server.close(() => {
-    console.log("✅ Server closed successfully");
-    process.exit(0);
-  });
-});
+  // Fermer les connexions socket
+  io.close();
 
-// Gestion des erreurs non capturées
-process.on("uncaughtException", async (error) => {
-  console.error("❌ Uncaught Exception:", error);
+  // Fermer la connexion à la base de données
+  await sequelize.close();
 
-  await AuditService.log({
-    action: "UNCAUGHT_EXCEPTION",
-    entity: "System",
-    details: {
-      error: error.message,
-      stack: error.stack,
-    },
-    severity: "critical",
-    success: false,
-    errorMessage: error.message,
-  });
-
-  process.exit(1);
-});
-
-process.on("unhandledRejection", async (reason, promise) => {
-  console.error("❌ Unhandled Rejection at:", promise, "reason:", reason);
-
-  await AuditService.log({
-    action: "UNHANDLED_REJECTION",
-    entity: "System",
-    details: {
-      reason: reason?.toString(),
-      promise: promise?.toString(),
-    },
-    severity: "critical",
-    success: false,
-    errorMessage: reason?.toString(),
-  });
+  console.log("✅ Server shutdown complete");
+  process.exit(0);
 });
 
 // Démarrer le serveur
 startServer();
-
-module.exports = app;
