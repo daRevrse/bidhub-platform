@@ -47,16 +47,26 @@ export const NotificationProvider = ({ children }) => {
   });
 
   // Authentifier le socket pour les notifications
+  // useEffect(() => {
+  //   if (socket && user) {
+  //     console.log("🔔 Authenticating socket for notifications...");
+  //     socket.emit("authenticate", { userId: user.id });
+  //   }
+  // }, [socket, user]);
+
   useEffect(() => {
-    if (socket && user) {
-      console.log("🔔 Authenticating socket for notifications...");
-      socket.emit("authenticate", { userId: user.id });
+    if (socket?.notifications && user) {
+      console.log("🔔 Authenticating notification socket...");
+      socket.notifications.emit("authenticate", { userId: user.id });
     }
   }, [socket, user]);
 
   // Écouter les notifications en temps réel
   useEffect(() => {
-    if (!socket) return;
+    // if (!socket) return;
+    if (!socket?.notifications) return;
+
+    const notificationSocket = socket.notifications;
 
     console.log("🔔 Setting up notification listeners...");
 
@@ -146,22 +156,45 @@ export const NotificationProvider = ({ children }) => {
     };
 
     // Attacher les listeners
-    socket.on("new_notification", handleNewNotification);
-    socket.on("unread_notifications", handleUnreadNotifications);
-    socket.on("notification_marked_read", handleNotificationRead);
-    socket.on("all_notifications_marked_read", handleAllNotificationsRead);
-    socket.on("system_notification", handleSystemNotification);
-    socket.on("room_notification", handleRoomNotification);
+    // socket.on("new_notification", handleNewNotification);
+    // socket.on("unread_notifications", handleUnreadNotifications);
+    // socket.on("notification_marked_read", handleNotificationRead);
+    // socket.on("all_notifications_marked_read", handleAllNotificationsRead);
+    // socket.on("system_notification", handleSystemNotification);
+    // socket.on("room_notification", handleRoomNotification);
+
+    notificationSocket.on("new_notification", handleNewNotification);
+    notificationSocket.on("unread_notifications", handleUnreadNotifications);
+    notificationSocket.on("notification_marked_read", handleNotificationRead);
+    notificationSocket.on(
+      "all_notifications_marked_read",
+      handleAllNotificationsRead
+    );
+    notificationSocket.on("system_notification", handleSystemNotification);
+    notificationSocket.on("room_notification", handleRoomNotification);
 
     // Cleanup
     return () => {
       console.log("🔔 Cleaning up notification listeners...");
-      socket.off("new_notification", handleNewNotification);
-      socket.off("unread_notifications", handleUnreadNotifications);
-      socket.off("notification_marked_read", handleNotificationRead);
-      socket.off("all_notifications_marked_read", handleAllNotificationsRead);
-      socket.off("system_notification", handleSystemNotification);
-      socket.off("room_notification", handleRoomNotification);
+      // socket.off("new_notification", handleNewNotification);
+      // socket.off("unread_notifications", handleUnreadNotifications);
+      // socket.off("notification_marked_read", handleNotificationRead);
+      // socket.off("all_notifications_marked_read", handleAllNotificationsRead);
+      // socket.off("system_notification", handleSystemNotification);
+      // socket.off("room_notification", handleRoomNotification);
+
+      notificationSocket.off("new_notification", handleNewNotification);
+      notificationSocket.off("unread_notifications", handleUnreadNotifications);
+      notificationSocket.off(
+        "notification_marked_read",
+        handleNotificationRead
+      );
+      notificationSocket.off(
+        "all_notifications_marked_read",
+        handleAllNotificationsRead
+      );
+      notificationSocket.off("system_notification", handleSystemNotification);
+      notificationSocket.off("room_notification", handleRoomNotification);
     };
   }, [socket]);
 

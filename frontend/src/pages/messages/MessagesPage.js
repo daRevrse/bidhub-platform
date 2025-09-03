@@ -71,6 +71,13 @@ const MessagesPage = () => {
     }
   }, [user, socket]);
 
+  // USEEFFECT SÉPARÉ POUR LES SOCKETS
+  useEffect(() => {
+    if (socket && user && typeof socket.emit === "function") {
+      setupSocketListeners();
+    }
+  }, [socket, user]);
+
   useEffect(() => {
     // Vérifier si une conversation est spécifiée dans l'URL
     const conversationId = searchParams.get("conversation");
@@ -92,7 +99,7 @@ const MessagesPage = () => {
   const initializeMessaging = async () => {
     try {
       await fetchConversations();
-      setupSocketListeners();
+      // setupSocketListeners();
     } catch (error) {
       console.error("Erreur initialisation messaging:", error);
     } finally {
@@ -102,12 +109,23 @@ const MessagesPage = () => {
 
   // Configuration des listeners Socket.io
   const setupSocketListeners = useCallback(() => {
-    if (!socket || !user) return;
+    // if (!socket || !user) return;
+    if (!socket || !user || typeof socket.emit !== "function") {
+      console.log("💬 Socket pas prêt pour les listeners");
+      return;
+    }
 
     console.log("🔌 Configuration des listeners pour les messages");
 
-    // Authentifier le socket pour les messages
-    socket.emit("authenticate", localStorage.getItem("token"));
+    // const token = localStorage.getItem("token");
+    // // Authentifier le socket pour les messages
+    // socket.emit("authenticate", token);
+
+    // AUTHENTIFIER LE SOCKET POUR LES MESSAGES
+    const token = localStorage.getItem("token");
+    if (token) {
+      socket.emit("authenticate", token);
+    }
 
     // Nouveau message reçu
     const handleNewMessage = (message) => {
@@ -183,11 +201,13 @@ const MessagesPage = () => {
     socket.on("user_offline", handleUserOffline);
 
     return () => {
-      socket.off("new_message", handleNewMessage);
-      socket.off("messages_read", handleMessagesRead);
-      socket.off("user_typing", handleUserTyping);
-      socket.off("user_online", handleUserOnline);
-      socket.off("user_offline", handleUserOffline);
+      if (socket && typeof socket.off === "function") {
+        socket.off("new_message", handleNewMessage);
+        socket.off("messages_read", handleMessagesRead);
+        socket.off("user_typing", handleUserTyping);
+        socket.off("user_online", handleUserOnline);
+        socket.off("user_offline", handleUserOffline);
+      }
     };
   }, [socket, user, activeConversation]);
 
@@ -232,7 +252,10 @@ const MessagesPage = () => {
     setMessages([]);
 
     // Rejoindre la conversation via socket
-    if (socket) {
+    // if (socket) {
+    //   socket.emit("join_conversation", conversation.id);
+    // }
+    if (socket && typeof socket.emit === "function") {
       socket.emit("join_conversation", conversation.id);
     }
 
@@ -371,7 +394,12 @@ const MessagesPage = () => {
 
   // Gestion de la frappe
   const handleTyping = useCallback(() => {
-    if (socket && activeConversation) {
+    // if (socket && activeConversation) {
+    //   socket.emit("typing", {
+    //     conversationId: activeConversation.id,
+    //     isTyping: true,
+    //   });
+    if (socket && activeConversation && typeof socket.emit === "function") {
       socket.emit("typing", {
         conversationId: activeConversation.id,
         isTyping: true,
@@ -379,10 +407,16 @@ const MessagesPage = () => {
 
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
-        socket.emit("typing", {
-          conversationId: activeConversation.id,
-          isTyping: false,
-        });
+        // socket.emit("typing", {
+        //   conversationId: activeConversation.id,
+        //   isTyping: false,
+        // });
+        if (socket && typeof socket.emit === "function") {
+          socket.emit("typing", {
+            conversationId: activeConversation.id,
+            isTyping: false,
+          });
+        }
       }, 1500);
     }
   }, [socket, activeConversation]);
@@ -483,10 +517,26 @@ const MessagesPage = () => {
     );
   }
 
+  // if (loading) {
+  //   return (
+  //     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+  //       <div className="animate-spin rounded-full h-12 w-12 border-2 border-blue-600 border-t-transparent"></div>
+  //     </div>
+  //   );
+  // }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-2 border-blue-600 border-t-transparent"></div>
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-blue-600 border-t-transparent"></div>
+          <p className="mt-4 text-gray-600">Chargement des conversations...</p>
+          {!socket && (
+            <p className="mt-2 text-sm text-orange-600">
+              Connexion au serveur...
+            </p>
+          )}
+        </div>
       </div>
     );
   }

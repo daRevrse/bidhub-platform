@@ -18,11 +18,19 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
 
   // Calculer le temps restant
   useEffect(() => {
+    if (!auction?.endTime) return;
+
     const updateTimeRemaining = () => {
       const now = new Date();
-      const end = new Date(auction?.endTime);
+      const end = new Date(auction.endTime);
       const diff = Math.max(0, end - now);
       setTimeRemaining(Math.floor(diff / 1000));
+
+      // Déclencher l'état "se termine bientôt"
+      if (diff <= 300000 && diff > 0) {
+        // 5 minutes
+        setIsEnding(true);
+      }
     };
 
     updateTimeRemaining();
@@ -32,26 +40,44 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
 
   // Gestion des événements socket
   useEffect(() => {
-    if (!socket || !user) return;
+    // Vérifications de sécurité
+    if (!socket || !user || !auction?.id || typeof socket.emit !== "function") {
+      console.log("🔨 Socket pas prêt pour l'enchère:", {
+        socket: !!socket,
+        user: !!user,
+        auction: !!auction,
+        hasEmit: typeof socket?.emit,
+      });
+      return;
+    }
+
+    console.log("🔨 Configuration socket pour enchère:", auction.id);
 
     // Rejoindre la salle d'enchère
-    socket.emit("join_auction", auction?.id);
+    socket.emit("join_auction", auction.id);
 
-    // Écouter les événements
+    // Handlers des événements
     const handleAuctionJoined = (data) => {
-      setParticipants(data.participantsCount);
-      console.log("Joined auction room");
+      setParticipants(data.participantsCount || 0);
+      console.log(
+        "🔨 Salle d'enchère rejointe, participants:",
+        data.participantsCount
+      );
     };
 
     const handleNewBid = (bidData) => {
+      console.log("🔨 Nouvelle enchère reçue:", bidData);
+
       // Mettre à jour les offres récentes
       setRecentBids((prev) => [bidData, ...prev.slice(0, 4)]);
 
       // Mettre à jour le prix courant via le callback parent
-      onBidUpdate(bidData.currentPrice);
+      if (onBidUpdate && bidData.currentPrice) {
+        onBidUpdate(bidData.currentPrice);
+      }
 
-      // Message de notification
-      if (bidData.bidder.id !== user.id) {
+      // Message de notification pour les autres participants
+      if (bidData.bidder && bidData.bidder.id !== user.id) {
         setMessage(
           `${bidData.bidder.firstName} a placé une offre de ${formatPrice(
             bidData.amount
@@ -62,26 +88,38 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
     };
 
     const handleBidPlaced = (data) => {
+      console.log("🔨 Réponse placement enchère:", data);
       if (data.success) {
         setBidding(false);
         setBidAmount("");
         setMessage("Offre placée avec succès !");
         setTimeout(() => setMessage(""), 3000);
+      } else {
+        setBidding(false);
+        setMessage(data.message || "Erreur lors du placement de l'offre");
+        setTimeout(() => setMessage(""), 5000);
       }
     };
 
     const handleBidError = (error) => {
+      console.error("🔨 Erreur enchère:", error);
       setBidding(false);
-      setMessage(`Erreur: ${error}`);
+      setMessage(
+        `Erreur: ${
+          typeof error === "string" ? error : error.message || "Erreur inconnue"
+        }`
+      );
       setTimeout(() => setMessage(""), 5000);
     };
 
     const handleParticipantJoined = (data) => {
-      setParticipants(data.participantsCount);
+      setParticipants(data.participantsCount || 0);
+      console.log("🔨 Nouveau participant, total:", data.participantsCount);
     };
 
     const handleParticipantLeft = (data) => {
-      setParticipants(data.participantsCount);
+      setParticipants(data.participantsCount || 0);
+      console.log("🔨 Participant parti, total:", data.participantsCount);
     };
 
     const handleAuctionEndingSoon = (data) => {
@@ -89,53 +127,76 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
       setMessage(
         "⏰ Attention ! L'enchère se termine dans moins de 5 minutes !"
       );
+      setTimeout(() => setMessage(""), 10000);
     };
 
     const handleAuctionEnded = (data) => {
-      setMessage(
-        `🏆 Enchère terminée ! Gagnant: ${data.winner.firstName} (${formatPrice(
-          data.winningAmount
-        )})`
-      );
-      onBidUpdate("ended");
+      console.log("🔨 Enchère terminée:", data);
+      if (data.winner) {
+        setMessage(
+          `🏆 Enchère terminée ! Gagnant: ${
+            data.winner.firstName
+          } (${formatPrice(data.winningAmount)})`
+        );
+      } else {
+        setMessage("🏆 Enchère terminée !");
+      }
+
+      if (onBidUpdate) {
+        onBidUpdate("ended");
+      }
+
+      setTimeout(() => setMessage(""), 15000);
     };
 
     const handleAuctionEndedNoBids = (data) => {
-      setMessage("Enchère terminée sans offres");
-      onBidUpdate("ended");
+      console.log("🔨 Enchère terminée sans offres:", data);
+      setMessage("📭 Enchère terminée sans offres");
+      if (onBidUpdate) {
+        onBidUpdate("ended");
+      }
+      setTimeout(() => setMessage(""), 10000);
     };
 
-    // Attacher les écouteurs
-    socket.on("auction_joined", handleAuctionJoined);
-    socket.on("new_bid", handleNewBid);
-    socket.on("bid_placed", handleBidPlaced);
-    socket.on("bid_error", handleBidError);
-    socket.on("participant_joined", handleParticipantJoined);
-    socket.on("participant_left", handleParticipantLeft);
-    socket.on("auction_ending_soon", handleAuctionEndingSoon);
-    socket.on("auction_ended", handleAuctionEnded);
-    socket.on("auction_ended_no_bids", handleAuctionEndedNoBids);
+    // Attacher tous les listeners
+    const listeners = [
+      ["auction_joined", handleAuctionJoined],
+      ["new_bid", handleNewBid],
+      ["bid_placed", handleBidPlaced],
+      ["bid_error", handleBidError],
+      ["participant_joined", handleParticipantJoined],
+      ["participant_left", handleParticipantLeft],
+      ["auction_ending_soon", handleAuctionEndingSoon],
+      ["auction_ended", handleAuctionEnded],
+      ["auction_ended_no_bids", handleAuctionEndedNoBids],
+    ];
+
+    listeners.forEach(([event, handler]) => {
+      socket.on(event, handler);
+    });
 
     // Cleanup
     return () => {
-      socket.emit("leave_auction", auction?.id);
-      socket.off("auction_joined", handleAuctionJoined);
-      socket.off("new_bid", handleNewBid);
-      socket.off("bid_placed", handleBidPlaced);
-      socket.off("bid_error", handleBidError);
-      socket.off("participant_joined", handleParticipantJoined);
-      socket.off("participant_left", handleParticipantLeft);
-      socket.off("auction_ending_soon", handleAuctionEndingSoon);
-      socket.off("auction_ended", handleAuctionEnded);
-      socket.off("auction_ended_no_bids", handleAuctionEndedNoBids);
+      if (socket && typeof socket.off === "function") {
+        // Quitter la salle d'enchère
+        if (typeof socket.emit === "function") {
+          socket.emit("leave_auction", auction.id);
+        }
+
+        // Détacher tous les listeners
+        listeners.forEach(([event, handler]) => {
+          socket.off(event, handler);
+        });
+      }
     };
   }, [socket, auction?.id, user, onBidUpdate]);
 
-  const formatPrice = (price) => {
+  // Fonctions utilitaires
+  const formatPrice = useCallback((price) => {
     return new Intl.NumberFormat("fr-FR").format(price) + " FCFA";
-  };
+  }, []);
 
-  const formatTime = (seconds) => {
+  const formatTime = useCallback((seconds) => {
     if (seconds <= 0) return "Terminée";
 
     const days = Math.floor(seconds / (24 * 60 * 60));
@@ -146,42 +207,126 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
     if (days > 0) return `${days}j ${hours}h ${minutes}m`;
     if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
     return `${minutes}m ${secs}s`;
-  };
+  }, []);
 
-  const handleBidSubmit = (e) => {
-    e.preventDefault();
+  // Fonction pour placer une enchère
+  const handleBidSubmit = useCallback(
+    (e) => {
+      e.preventDefault();
 
-    if (!socket) {
-      setMessage("Connexion en cours...");
-      return;
-    }
+      // Vérifications de sécurité
+      if (!socket || typeof socket.emit !== "function") {
+        setMessage("Connexion en cours... Veuillez patienter.");
+        return;
+      }
 
-    const amount = parseFloat(bidAmount);
-    if (isNaN(amount) || amount <= auction?.currentPrice) {
-      setMessage(
-        `L'offre doit être supérieure à ${formatPrice(auction?.currentPrice)}`
-      );
-      setTimeout(() => setMessage(""), 3000);
-      return;
-    }
+      if (bidding) {
+        setMessage("Enchère en cours, veuillez patienter...");
+        return;
+      }
 
-    setBidding(true);
-    socket.emit("place_bid", {
-      auctionId: auction?.id,
-      amount,
-    });
-  };
+      const amount = parseFloat(bidAmount);
 
+      // Validation du montant
+      if (isNaN(amount) || amount <= 0) {
+        setMessage("Veuillez entrer un montant valide");
+        setTimeout(() => setMessage(""), 3000);
+        return;
+      }
+
+      if (amount <= (auction?.currentPrice || 0)) {
+        setMessage(
+          `L'offre doit être supérieure à ${formatPrice(
+            auction?.currentPrice || 0
+          )}`
+        );
+        setTimeout(() => setMessage(""), 3000);
+        return;
+      }
+
+      const minBid = (auction?.currentPrice || 0) + 100;
+      if (amount < minBid) {
+        setMessage(`L'offre minimum est de ${formatPrice(minBid)}`);
+        setTimeout(() => setMessage(""), 3000);
+        return;
+      }
+
+      // Placer l'enchère
+      setBidding(true);
+      setMessage("Placement de votre offre...");
+
+      console.log("🔨 Placement enchère:", {
+        auctionId: auction.id,
+        amount,
+        userId: user.id,
+      });
+
+      socket.emit("place_bid", {
+        auctionId: auction.id,
+        amount,
+        userId: user.id,
+      });
+    },
+    [
+      socket,
+      bidding,
+      bidAmount,
+      auction?.currentPrice,
+      auction?.id,
+      user?.id,
+      formatPrice,
+    ]
+  );
+
+  // Fonctions pour les boutons rapides
+  const handleQuickBid = useCallback(
+    (increment) => {
+      const newAmount = (auction?.currentPrice || 0) + increment;
+      setBidAmount(newAmount.toString());
+    },
+    [auction?.currentPrice]
+  );
+
+  // Conditions d'affichage
   const canBid =
-    user && auction?.product.sellerId !== user.id && timeRemaining > 0;
+    user &&
+    auction?.product?.sellerId !== user.id &&
+    timeRemaining > 0 &&
+    auction?.status === "active";
+
+  const isOwner = user && auction?.product?.sellerId === user.id;
+  const isWinner =
+    user && auction?.winnerId === user.id && auction?.status === "ended";
+
+  // États de chargement
+  if (!socket) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="flex items-center">
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-600 border-t-transparent mr-3"></div>
+          <span className="text-yellow-800">
+            Connexion au serveur d'enchères...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!auction) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <p className="text-gray-600 text-center">Enchère non disponible</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Statut de l'enchère */}
       <div
-        className={`rounded-lg p-4 ${
+        className={`rounded-lg p-4 transition-all duration-300 ${
           isEnding
-            ? "bg-red-50 border-2 border-red-200"
+            ? "bg-red-50 border-2 border-red-200 animate-pulse"
             : "bg-blue-50 border border-blue-200"
         }`}
       >
@@ -189,7 +334,7 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <div
-                className={`w-3 h-3 rounded-full ${
+                className={`w-3 h-3 rounded-full transition-all ${
                   timeRemaining > 0
                     ? "bg-green-500 animate-pulse"
                     : "bg-red-500"
@@ -199,14 +344,15 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
                 {timeRemaining > 0 ? "Enchère en cours" : "Enchère terminée"}
               </span>
             </div>
-            <span className="text-sm text-gray-600">
-              👥 {participants} participant{participants > 1 ? "s" : ""}
+            <span className="text-sm text-gray-600 flex items-center">
+              <span className="mr-1">👥</span>
+              {participants} participant{participants > 1 ? "s" : ""}
             </span>
           </div>
           <div className="text-right">
             <div
-              className={`font-bold text-lg ${
-                isEnding ? "text-red-600" : "text-gray-900"
+              className={`font-bold text-lg transition-colors ${
+                isEnding ? "text-red-600 animate-pulse" : "text-gray-900"
               }`}
             >
               {formatTime(timeRemaining)}
@@ -216,83 +362,102 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
         </div>
       </div>
 
-      {/* Messages */}
+      {/* Messages d'état */}
       {message && (
         <div
-          className={`p-3 rounded-lg ${
+          className={`p-3 rounded-lg transition-all duration-300 ${
             message.includes("Erreur")
-              ? "bg-red-100 text-red-700"
+              ? "bg-red-100 text-red-700 border border-red-200"
               : message.includes("succès")
-              ? "bg-green-100 text-green-700"
-              : "bg-blue-100 text-blue-700"
+              ? "bg-green-100 text-green-700 border border-green-200"
+              : "bg-blue-100 text-blue-700 border border-blue-200"
           }`}
         >
-          {message}
+          <div className="flex items-center">
+            {message.includes("Erreur") ? (
+              <span className="text-red-500 mr-2">❌</span>
+            ) : message.includes("succès") ? (
+              <span className="text-green-500 mr-2">✅</span>
+            ) : (
+              <span className="text-blue-500 mr-2">ℹ️</span>
+            )}
+            {message}
+          </div>
         </div>
       )}
 
       {/* Formulaire d'enchère */}
-      {canBid && timeRemaining > 0 && (
-        <div className="bg-white border rounded-lg p-4">
+      {canBid && (
+        <div className="bg-white border rounded-lg p-4 shadow-sm">
           <form onSubmit={handleBidSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Votre offre (minimum: {formatPrice(auction?.currentPrice + 100)}
-                )
+                Votre offre (minimum:{" "}
+                {formatPrice((auction?.currentPrice || 0) + 100)})
               </label>
               <div className="flex space-x-2">
                 <input
                   type="number"
                   value={bidAmount}
                   onChange={(e) => setBidAmount(e.target.value)}
-                  min={auction?.currentPrice + 100}
+                  min={(auction?.currentPrice || 0) + 100}
                   step="100"
-                  className="flex-1 form-input"
-                  placeholder={`${auction?.currentPrice + 1000}`}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder={`${(auction?.currentPrice || 0) + 1000}`}
                   disabled={bidding}
+                  required
                 />
                 <button
                   type="submit"
-                  disabled={bidding || !bidAmount}
-                  className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                  disabled={
+                    bidding ||
+                    !bidAmount ||
+                    parseFloat(bidAmount) <= (auction?.currentPrice || 0)
+                  }
+                  className={`px-6 py-2 rounded-lg font-semibold transition-all transform ${
                     bidding
-                      ? "bg-gray-400 cursor-not-allowed"
+                      ? "bg-gray-400 cursor-not-allowed scale-95"
                       : isEnding
-                      ? "bg-red-600 hover:bg-red-700 text-white animate-pulse"
-                      : "bg-green-600 hover:bg-green-700 text-white hover:scale-105"
-                  } disabled:opacity-50`}
+                      ? "bg-red-600 hover:bg-red-700 text-white animate-pulse hover:scale-105 shadow-lg"
+                      : "bg-green-600 hover:bg-green-700 text-white hover:scale-105 shadow-lg hover:shadow-xl"
+                  } disabled:opacity-50 disabled:transform-none`}
                 >
-                  {bidding
-                    ? "Enchère..."
-                    : isEnding
-                    ? "⚡ Enchérir"
-                    : "Enchérir"}
+                  {bidding ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      <span>Enchère...</span>
+                    </div>
+                  ) : isEnding ? (
+                    "⚡ Enchérir"
+                  ) : (
+                    "Enchérir"
+                  )}
                 </button>
               </div>
             </div>
 
             {/* Boutons rapides */}
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setBidAmount(auction?.currentPrice + 500)}
-                className="btn-secondary text-sm"
+                onClick={() => handleQuickBid(500)}
+                className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
                 disabled={bidding}
               >
                 +500 FCFA
               </button>
               <button
                 type="button"
-                onClick={() => setBidAmount(auction?.currentPrice + 1000)}
-                className="btn-secondary text-sm"
+                onClick={() => handleQuickBid(1000)}
+                className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
                 disabled={bidding}
               >
                 +1000 FCFA
               </button>
               <button
                 type="button"
-                onClick={() => setBidAmount(auction?.currentPrice + 5000)}
-                className="btn-secondary text-sm"
+                onClick={() => handleQuickBid(5000)}
+                className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
                 disabled={bidding}
               >
                 +5000 FCFA
@@ -304,31 +469,32 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
 
       {/* Offres récentes en temps réel */}
       {recentBids.length > 0 && (
-        <div className="bg-white border rounded-lg p-4">
+        <div className="bg-white border rounded-lg p-4 shadow-sm">
           <h3 className="font-semibold mb-3 flex items-center">
             <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
             Offres récentes
           </h3>
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-64 overflow-y-auto">
             {recentBids.map((bid, index) => (
               <div
-                key={bid.id}
-                className={`flex justify-between items-center p-2 rounded ${
+                key={bid.id || index}
+                className={`flex justify-between items-center p-3 rounded-lg transition-all ${
                   index === 0
-                    ? "bg-green-50 border border-green-200"
+                    ? "bg-green-50 border border-green-200 shadow-sm"
                     : "bg-gray-50"
                 }`}
               >
                 <div className="flex items-center space-x-2">
-                  <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center text-xs">
-                    {bid.bidder.firstName[0]}
-                    {bid.bidder.lastName[0]}
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                    {bid.bidder?.firstName?.[0] || "?"}
+                    {bid.bidder?.lastName?.[0] || ""}
                   </div>
-                  <span className="text-sm">
-                    {bid.bidder.firstName} {bid.bidder.lastName[0]}.
+                  <span className="text-sm font-medium">
+                    {bid.bidder?.firstName || "Utilisateur"}{" "}
+                    {bid.bidder?.lastName?.[0] || ""}.
                   </span>
                   {index === 0 && (
-                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium">
                       Plus haute
                     </span>
                   )}
@@ -342,7 +508,9 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
                     {formatPrice(bid.amount)}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {new Date(bid.timestamp).toLocaleTimeString("fr-FR")}
+                    {bid.timestamp
+                      ? new Date(bid.timestamp).toLocaleTimeString("fr-FR")
+                      : "maintenant"}
                   </div>
                 </div>
               </div>
@@ -353,44 +521,43 @@ const RealTimeBidding = ({ auction, onBidUpdate }) => {
 
       {/* Messages pour les cas spéciaux */}
       {!user && (
-        <div className="text-center bg-gray-50 p-4 rounded-lg">
-          <p className="text-gray-600 mb-3">
+        <div className="text-center bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border">
+          <p className="text-gray-700 mb-4 font-medium">
             Connectez-vous pour participer à cette enchère
           </p>
-          {/* <button className="btn-primary">Se connecter</button> */}
           <Link
             to="/login"
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
+            className="inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
           >
             Se connecter
           </Link>
         </div>
       )}
 
-      {user && auction?.product.sellerId === user.id && (
+      {isOwner && (
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-center">
-          <p className="text-blue-700">
-            C'est votre enchère - vous pouvez suivre les offres en temps réel
+          <p className="text-blue-700 font-medium">
+            📊 C'est votre enchère - vous pouvez suivre les offres en temps réel
           </p>
         </div>
       )}
 
-      {timeRemaining <= 0 && (
+      {timeRemaining <= 0 && !isWinner && (
         <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg text-center">
           <p className="text-gray-700 font-medium">
-            Cette enchère est terminée
+            ⏰ Cette enchère est terminée
           </p>
         </div>
       )}
 
-      {user && auction?.winnerId === user.id && auction?.status === "ended" && (
-        <div className="bg-green-50 border border-green-200 p-4 rounded-lg text-center">
-          <p className="text-green-700 font-medium mb-3">
+      {isWinner && (
+        <div className="bg-green-50 border border-green-200 p-6 rounded-lg text-center">
+          <p className="text-green-700 font-bold text-lg mb-4">
             🎉 Félicitations ! Vous avez remporté cette enchère
           </p>
           <button
-            onClick={() => navigate(`/payment/${auction?.id}`)}
-            className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg"
+            onClick={() => navigate(`/payment/${auction.id}`)}
+            className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-all transform hover:scale-105 shadow-lg hover:shadow-xl"
           >
             💳 Finaliser le paiement
           </button>

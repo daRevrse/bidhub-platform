@@ -17,8 +17,34 @@ class MessageSocketManager {
       console.log(`💬 User connected to messaging: ${socket.id}`);
 
       // Authentification
-      socket.on("authenticate", async (token) => {
+      socket.on("authenticate", async (data) => {
         try {
+          let token;
+
+          // Gérer les différents formats d'authentification
+          if (typeof data === "string") {
+            // Format: socket.emit("authenticate", "jwt_token_string")
+            token = data;
+          } else if (data && typeof data === "object") {
+            if (data.token) {
+              // Format: socket.emit("authenticate", { token: "jwt_token_string" })
+              token = data.token;
+            } else if (data.userId) {
+              // Format: socket.emit("authenticate", { userId: 123 })
+              // C'est pour les notifications, pas les messages
+              socket.userId = data.userId;
+              console.log(
+                `💬 User ${data.userId} connected for messages (userId only)`
+              );
+              return;
+            }
+          }
+
+          if (!token) {
+            socket.emit("auth_error", "Token manquant");
+            return;
+          }
+
           const decoded = jwt.verify(token, process.env.JWT_SECRET);
           socket.userId = decoded.userId;
           socket.userEmail = decoded.email;
@@ -85,11 +111,25 @@ class MessageSocketManager {
           socket.emit("joined_conversation", { conversationId });
 
           // Notifier l'autre participant de la présence
-          socket.to(`conversation_${conversationId}`).emit("user_joined", {
-            userId: socket.userId,
-            conversationId,
-            timestamp: new Date(),
-          });
+          // socket.to(`conversation_${conversationId}`).emit("user_joined", {
+          //   userId: socket.userId,
+          //   conversationId,
+          //   timestamp: new Date(),
+          // });
+          // NOTIFIER SEULEMENT L'AUTRE PARTICIPANT (PAS TOUT LE MONDE)
+          const otherParticipantId =
+            conversation.participant1Id === socket.userId
+              ? conversation.participant2Id
+              : conversation.participant1Id;
+
+          const otherSocket = this.userSockets.get(otherParticipantId);
+          if (otherSocket) {
+            this.io.to(otherSocket).emit("user_joined", {
+              userId: socket.userId,
+              conversationId,
+              timestamp: new Date(),
+            });
+          }
 
           console.log(
             `💬 User ${socket.userId} joined conversation ${conversationId}`

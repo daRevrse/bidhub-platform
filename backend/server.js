@@ -88,10 +88,16 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// CRÉER DES NAMESPACES SÉPARÉS
+const messagesNamespace = io.of("/messages");
+const notificationsNamespace = io.of("/notifications");
+
 // INITIALISER LES GESTIONNAIRES SOCKET.IO
 const auctionSocketManager = new AuctionSocketManager(io);
-const messageSocketManager = new MessageSocketManager(io);
-const notificationSocketManager = new NotificationSocketManager(io);
+const messageSocketManager = new MessageSocketManager(messagesNamespace);
+const notificationSocketManager = new NotificationSocketManager(
+  notificationsNamespace
+);
 
 // CONNECTER LE SERVICE DE NOTIFICATION AU GESTIONNAIRE SOCKET
 notificationService.setSocketManager(notificationSocketManager);

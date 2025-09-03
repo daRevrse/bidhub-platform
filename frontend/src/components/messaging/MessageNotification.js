@@ -38,28 +38,19 @@ const MessageNotification = () => {
   useEffect(() => {
     if (user) {
       fetchUnreadCount();
-      setupSocketListeners();
+      // setupSocketListeners();
 
       // Actualiser périodiquement
       const interval = setInterval(fetchUnreadCount, 60000); // 1 minute
       return () => clearInterval(interval);
     }
-  }, [user, socket]);
+  }, [user]);
 
-  // Fermer le dropdown en cliquant à l'extérieur
+  // USEEFFECT SÉPARÉ POUR LES SOCKET LISTENERS
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
+    if (!socket || !user) return;
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const setupSocketListeners = () => {
-    if (!socket) return;
+    console.log("💬 Setting up socket listeners for MessageNotification");
 
     const handleNewMessage = (message) => {
       console.log("💬 Nouveau message reçu:", message);
@@ -80,14 +71,65 @@ const MessageNotification = () => {
       }
     };
 
-    socket.on("new_message", handleNewMessage);
-    socket.on("messages_read", handleMessagesRead);
+    // VÉRIFIER QUE socket.on EXISTE AVANT DE L'UTILISER
+    if (typeof socket.on === "function") {
+      socket.on("new_message", handleNewMessage);
+      socket.on("messages_read", handleMessagesRead);
+    } else {
+      console.warn("💬 Socket.on n'est pas disponible:", socket);
+    }
 
+    // CLEANUP
     return () => {
-      socket.off("new_message", handleNewMessage);
-      socket.off("messages_read", handleMessagesRead);
+      if (socket && typeof socket.off === "function") {
+        socket.off("new_message", handleNewMessage);
+        socket.off("messages_read", handleMessagesRead);
+      }
     };
-  };
+  }, [socket, user, isOpen]);
+
+  // Fermer le dropdown en cliquant à l'extérieur
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // const setupSocketListeners = () => {
+  //   if (!socket) return;
+
+  //   const handleNewMessage = (message) => {
+  //     console.log("💬 Nouveau message reçu:", message);
+  //     fetchUnreadCount();
+
+  //     // Si le dropdown est ouvert, actualiser les messages récents
+  //     if (isOpen) {
+  //       loadRecentMessages();
+  //     }
+  //   };
+
+  //   const handleMessagesRead = (data) => {
+  //     console.log("💬 Messages marqués comme lus:", data);
+  //     fetchUnreadCount();
+
+  //     if (isOpen) {
+  //       loadRecentMessages();
+  //     }
+  //   };
+
+  //   socket.on("new_message", handleNewMessage);
+  //   socket.on("messages_read", handleMessagesRead);
+
+  //   return () => {
+  //     socket.off("new_message", handleNewMessage);
+  //     socket.off("messages_read", handleMessagesRead);
+  //   };
+  // };
 
   const fetchUnreadCount = async () => {
     try {
@@ -107,21 +149,31 @@ const MessageNotification = () => {
         params: { limit: 5, page: 1 },
       });
 
-      // Extraire les derniers messages de chaque conversation
-      const conversations = response.data.conversations.conversations || [];
-      const recentMessagesData = conversations
+      console.log("response.data", response.data);
+
+      const conversationsData =
+        response.data.conversations?.conversations || [];
+
+      const recentMessagesData = conversationsData
         .filter((conv) => conv.lastMessage)
         .map((conv) => ({
-          ...conv.lastMessage,
+          id: conv.lastMessage.id,
+          content: conv.lastMessage.content,
+          messageType: conv.lastMessage.messageType || "text",
+          createdAt: conv.lastMessage.createdAt,
+          senderId: conv.lastMessage.senderId,
+          isRead: conv.lastMessage.isRead || false,
           conversationId: conv.id,
           otherParticipant: conv.otherParticipant,
           unreadCount: conv.unreadCount || 0,
+          sender: conv.lastMessage.sender || null,
         }))
         .slice(0, 5);
 
       setRecentMessages(recentMessagesData);
     } catch (error) {
       console.error("Erreur récupération messages récents:", error);
+      setRecentMessages([]);
     } finally {
       setLoading(false);
     }

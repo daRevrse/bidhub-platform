@@ -81,11 +81,9 @@ router.post("/conversations", auth, async (req, res) => {
     }
 
     if (participantId === userId) {
-      return res
-        .status(400)
-        .json({
-          message: "Impossible de créer une conversation avec soi-même",
-        });
+      return res.status(400).json({
+        message: "Impossible de créer une conversation avec soi-même",
+      });
     }
 
     const conversation = await messagingService.getOrCreateConversation(
@@ -191,12 +189,23 @@ router.post(
       );
 
       // ÉMETTRE VIA SOCKET.IO POUR LE TEMPS RÉEL
+      // if (req.io) {
+      //   req.io
+      //     .to(`conversation_${conversationId}`)
+      //     .emit("new_message", message);
+      //   console.log(
+      //     `💬 Message diffusé via Socket.io dans conversation ${conversationId}`
+      //   );
+      // }
+
       if (req.io) {
-        req.io
+        // Utiliser le namespace messages
+        const messagesNamespace = req.io.of("/messages");
+        messagesNamespace
           .to(`conversation_${conversationId}`)
           .emit("new_message", message);
         console.log(
-          `💬 Message diffusé via Socket.io dans conversation ${conversationId}`
+          `💬 Message diffusé via namespace /messages dans conversation ${conversationId}`
         );
       }
 
@@ -252,14 +261,29 @@ router.put("/conversations/:id/read", auth, async (req, res) => {
     await messagingService.markAsRead(conversationId, userId);
 
     // NOTIFIER L'AUTRE PARTICIPANT VIA SOCKET.IO
+    // if (req.io) {
+    //   req.io.to(`conversation_${conversationId}`).emit("messages_read", {
+    //     conversationId,
+    //     readById: userId,
+    //     timestamp: new Date(),
+    //   });
+    //   console.log(
+    //     `💬 Messages read notification diffusée pour conversation ${conversationId}`
+    //   );
+    // }
+
     if (req.io) {
-      req.io.to(`conversation_${conversationId}`).emit("messages_read", {
-        conversationId,
-        readById: userId,
-        timestamp: new Date(),
-      });
+      // Utiliser le namespace messages
+      const messagesNamespace = req.io.of("/messages");
+      messagesNamespace
+        .to(`conversation_${conversationId}`)
+        .emit("messages_read", {
+          conversationId,
+          readById: userId,
+          timestamp: new Date(),
+        });
       console.log(
-        `💬 Messages read notification diffusée pour conversation ${conversationId}`
+        `💬 Messages read notification diffusée via namespace /messages pour conversation ${conversationId}`
       );
     }
 
