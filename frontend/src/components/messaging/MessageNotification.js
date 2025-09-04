@@ -155,18 +155,20 @@ const MessageNotification = () => {
         response.data.conversations?.conversations || [];
 
       const recentMessagesData = conversationsData
-        .filter((conv) => conv.lastMessage)
+        .filter((conv) => conv.lastMessagePreview) // Utiliser lastMessagePreview au lieu de lastMessage
         .map((conv) => ({
-          id: conv.lastMessage.id,
-          content: conv.lastMessage.content,
-          messageType: conv.lastMessage.messageType || "text",
-          createdAt: conv.lastMessage.createdAt,
-          senderId: conv.lastMessage.senderId,
-          isRead: conv.lastMessage.isRead || false,
+          id: conv.id, // Utiliser l'ID de la conversation
+          content: conv.lastMessagePreview, // Utiliser lastMessagePreview comme contenu
+          messageType: "text", // Défaut à "text" puisque le type n'est pas fourni
+          createdAt: conv.lastMessageAt, // Utiliser lastMessageAt comme date de création
+          senderId: null, // Non disponible dans la réponse
+          isRead: conv.unreadCount === 0, // Déduire de unreadCount
           conversationId: conv.id,
           otherParticipant: conv.otherParticipant,
           unreadCount: conv.unreadCount || 0,
-          sender: conv.lastMessage.sender || null,
+          sender: null, // Non disponible dans la réponse
+          auction: conv.auction, // Ajouter les informations de l'enchère
+          lastMessageAt: conv.lastMessageAt, // Conserver la date du dernier message
         }))
         .slice(0, 5);
 
@@ -308,7 +310,7 @@ const MessageNotification = () => {
                         )}
 
                         {/* Indicateur en ligne (placeholder) */}
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-white dark:border-gray-800 rounded-full"></div>
+                        {/* <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-white dark:border-gray-800 rounded-full"></div> */}
                       </div>
 
                       {/* Contenu du message */}
