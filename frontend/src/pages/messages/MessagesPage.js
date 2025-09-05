@@ -1,4 +1,4 @@
-// frontend/src/pages/messages/MessagesPage.js - VERSION AMÉLIORÉE
+// frontend/src/pages/messages/MessagesPage.js - VERSION FUSIONNÉE AVEC SYSTÈME D'ENVOI AMÉLIORÉ
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useSocket } from "../../hooks/useSocket";
@@ -38,6 +38,7 @@ const MessagesPage = () => {
   const [searchResults, setSearchResults] = useState([]);
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [searchingUsers, setSearchingUsers] = useState(false);
+  const [showActions, setShowActions] = useState(false);
 
   // States pour les fonctionnalités avancées
   const [typingUsers, setTypingUsers] = useState(new Set());
@@ -47,6 +48,7 @@ const MessagesPage = () => {
 
   // Refs
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const messageInputRef = useRef(null);
@@ -64,101 +66,164 @@ const MessagesPage = () => {
     return config;
   });
 
-  // Effets principaux
-  useEffect(() => {
-    if (user) {
-      initializeMessaging();
-    }
-  }, [user, socket]);
+  // Fonction utilitaire pour générer des clés uniques
+  const generateMessageKey = (message, index) => {
+    return `${message.id}-${message.senderId}-${new Date(
+      message.createdAt
+    ).getTime()}-${index}`;
+  };
 
-  // USEEFFECT SÉPARÉ POUR LES SOCKETS
-  useEffect(() => {
-    if (socket && user && typeof socket.emit === "function") {
-      setupSocketListeners();
-    }
-  }, [socket, user]);
-
-  useEffect(() => {
-    // Vérifier si une conversation est spécifiée dans l'URL
-    const conversationId = searchParams.get("conversation");
-    if (conversationId && conversations.length > 0) {
-      const conversation = conversations.find(
-        (c) => c.id === parseInt(conversationId)
-      );
-      if (conversation) {
-        selectConversation(conversation);
-      }
-    }
-  }, [searchParams, conversations]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  // Initialisation
-  const initializeMessaging = async () => {
+  // FONCTIONS UTILITAIRES OPTIMISÉES
+  const fetchConversationsOptimized = useCallback(async () => {
     try {
-      await fetchConversations();
-      // setupSocketListeners();
+      const response = await api.get("/api/messages/conversations");
+      const conversationsData = response.data.conversations || [];
+
+      const enrichedConversations = conversationsData.map((conv) => ({
+        ...conv,
+        otherParticipant:
+          conv.participant1Id === user.id
+            ? conv.participant2
+            : conv.participant1,
+      }));
+
+      console.log("enrichedConversations", response);
+
+      setConversations(enrichedConversations);
+    } catch (error) {
+      console.error("Erreur chargement conversations:", error);
+    }
+  }, [user?.id]);
+
+  const fetchMessages = useCallback(async (conversationId) => {
+    try {
+      console.log(`📨 Chargement messages pour conversation ${conversationId}`);
+      setLoadingMessages(true);
+
+      const response = await api.get(
+        `/api/messages/conversations/${conversationId}/messages`
+      );
+
+      const messagesData = (response.data.messages || []).map((msg) => ({
+        ...msg,
+        attachments: msg.attachments ? JSON.parse(msg.attachments) : [],
+      }));
+      console.log("messagesData", messagesData);
+      setMessages(messagesData);
+    } catch (error) {
+      console.error("Erreur chargement messages:", error);
+
+      // Gestion d'erreurs spécifiques
+      if (error.response?.status === 403) {
+        console.error("Accès refusé à cette conversation");
+        setMessages([]);
+      } else if (error.response?.status === 404) {
+        console.error("Conversation non trouvée");
+        setMessages([]);
+      } else {
+        console.error(
+          "Erreur serveur:",
+          error.response?.data?.message || error.message
+        );
+        setMessages([]);
+      }
+    } finally {
+      setLoadingMessages(false);
+    }
+  }, []);
+
+  const markAsRead = useCallback(async (conversationId) => {
+    try {
+      await api.put(`/api/messages/conversations/${conversationId}/read`);
+
+      // Mettre à jour localement SANS re-fetch
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv
+        )
+      );
+    } catch (error) {
+      console.error("Erreur marquage lecture:", error);
+    }
+  }, []);
+
+  // INITIALISATION
+  const initializeMessaging = useCallback(async () => {
+    try {
+      setLoading(true);
+      await fetchConversationsOptimized();
     } catch (error) {
       console.error("Erreur initialisation messaging:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchConversationsOptimized]);
 
-  // Configuration des listeners Socket.io
+  // SETUP SOCKET LISTENERS OPTIMISÉ
   const setupSocketListeners = useCallback(() => {
-    // if (!socket || !user) return;
-    if (!socket || !user || typeof socket.emit !== "function") {
-      console.log("💬 Socket pas prêt pour les listeners");
+    if (!socket || !user) {
+      console.log("💬 Socket ou user non disponible pour les listeners");
       return;
     }
 
-    console.log("🔌 Configuration des listeners pour les messages");
+    if (typeof socket.on !== "function" || typeof socket.off !== "function") {
+      console.error("💬 Socket n'a pas les méthodes on/off");
+      return;
+    }
 
-    // const token = localStorage.getItem("token");
-    // // Authentifier le socket pour les messages
-    // socket.emit("authenticate", token);
+    console.log("💬 Configuration des listeners Socket pour les messages");
 
-    // AUTHENTIFIER LE SOCKET POUR LES MESSAGES
+    // Authentifier le socket pour les messages
     const token = localStorage.getItem("token");
     if (token) {
       socket.emit("authenticate", token);
     }
 
-    // Nouveau message reçu
     const handleNewMessage = (message) => {
-      console.log("💬 Nouveau message reçu:", message);
+      console.log("💬 Nouveau message reçu en temps réel:", message);
 
+      // Ajouter uniquement si c'est pour la conversation active
       if (
         activeConversation &&
         message.conversationId === activeConversation.id
       ) {
         setMessages((prev) => [...prev, message]);
-        markAsRead(activeConversation.id);
       }
 
-      fetchConversations(); // Mettre à jour la liste des conversations
+      // Mettre à jour les conversations LOCALEMENT
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === message.conversationId
+            ? {
+                ...conv,
+                lastMessageAt: new Date().toISOString(),
+                lastMessagePreview:
+                  message.content?.substring(0, 100) || "[Fichier]",
+                unreadCount:
+                  conv.id === activeConversation?.id
+                    ? 0
+                    : (conv.unreadCount || 0) + 1,
+              }
+            : conv
+        )
+      );
     };
 
-    // Messages marqués comme lus
     const handleMessagesRead = (data) => {
       console.log("💬 Messages marqués comme lus:", data);
-
       if (activeConversation && data.conversationId === activeConversation.id) {
-        setMessages((prev) =>
-          prev.map((msg) => ({
-            ...msg,
-            isRead: msg.senderId === user.id ? true : msg.isRead,
-          }))
-        );
+        setMessages((prev) => prev.map((msg) => ({ ...msg, isRead: true })));
       }
+      // Mettre à jour les conversations LOCALEMENT
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === data.conversationId ? { ...conv, unreadCount: 0 } : conv
+        )
+      );
     };
 
-    // Utilisateur en train d'écrire
     const handleUserTyping = (data) => {
-      if (data.conversationId === activeConversation?.id) {
+      if (activeConversation && data.conversationId === activeConversation.id) {
         if (data.isTyping) {
           setTypingUsers((prev) => new Set([...prev, data.userId]));
         } else {
@@ -180,7 +245,6 @@ const MessagesPage = () => {
       }
     };
 
-    // Utilisateur en ligne/hors ligne
     const handleUserOnline = (data) => {
       setOnlineUsers((prev) => new Set([...prev, data.userId]));
     };
@@ -201,6 +265,7 @@ const MessagesPage = () => {
     socket.on("user_offline", handleUserOffline);
 
     return () => {
+      console.log("💬 Nettoyage des listeners Socket");
       if (socket && typeof socket.off === "function") {
         socket.off("new_message", handleNewMessage);
         socket.off("messages_read", handleMessagesRead);
@@ -209,117 +274,95 @@ const MessagesPage = () => {
         socket.off("user_offline", handleUserOffline);
       }
     };
-  }, [socket, user, activeConversation]);
+  }, [user, activeConversation?.id]);
 
-  // Récupération des données
-  const fetchConversations = async () => {
-    try {
-      const response = await api.get("/api/messages/conversations");
-      const conversationsData = response.data.conversations.conversations || [];
+  // GESTION DE LA SAISIE
+  const handleTyping = useCallback(() => {
+    if (!socket || !activeConversation || !user) return;
 
-      // Enrichir avec les informations d'autres participants
-      const enrichedConversations = conversationsData.map((conv) => ({
-        ...conv,
-        otherParticipant:
-          conv.participant1Id === user.id
-            ? conv.participant2
-            : conv.participant1,
-      }));
+    if (typeof socket.emit === "function") {
+      socket.emit("typing", {
+        conversationId: activeConversation.id,
+        isTyping: true,
+      });
 
-      setConversations(enrichedConversations);
-    } catch (error) {
-      console.error("Erreur chargement conversations:", error);
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        if (socket && typeof socket.emit === "function") {
+          socket.emit("typing", {
+            conversationId: activeConversation.id,
+            isTyping: false,
+          });
+        }
+      }, 1500);
     }
-  };
+  }, [socket, activeConversation, user]);
 
-  const fetchMessages = async (conversationId) => {
-    try {
-      setLoadingMessages(true);
-      const response = await api.get(
-        `/api/messages/conversations/${conversationId}/messages`
-      );
-      setMessages(response.data.messages || []);
-    } catch (error) {
-      console.error("Erreur chargement messages:", error);
-    } finally {
-      setLoadingMessages(false);
-    }
-  };
+  const handleMessageChange = useCallback(
+    (e) => {
+      setNewMessage(e.target.value);
 
-  // Actions principales
-  const selectConversation = async (conversation) => {
-    setActiveConversation(conversation);
-    setMessages([]);
+      // Throttle le typing indicator
+      if (!typingTimeoutRef.current) {
+        handleTyping();
+      }
+    },
+    [handleTyping]
+  );
 
-    // Rejoindre la conversation via socket
-    // if (socket) {
-    //   socket.emit("join_conversation", conversation.id);
-    // }
-    if (socket && typeof socket.emit === "function") {
-      socket.emit("join_conversation", conversation.id);
-    }
+  // SÉLECTION DE CONVERSATION - CORRIGÉE
+  const selectConversation = useCallback(
+    async (conversation) => {
+      try {
+        if (!conversation || !conversation.id) {
+          console.error("❌ Conversation invalide");
+          return;
+        }
 
-    // Charger les messages
-    await fetchMessages(conversation.id);
+        // Si on clique sur la conversation déjà active, on ne fait rien
+        if (activeConversation && activeConversation.id === conversation.id) {
+          console.log("💬 Conversation déjà active:", conversation.id);
+          return;
+        }
 
-    // Marquer comme lu si non lus
-    if (conversation.unreadCount > 0) {
-      await markAsRead(conversation.id);
-    }
-  };
+        console.log("💬 Sélection de la conversation:", conversation.id);
 
-  // const sendMessage = async (e) => {
-  //   e.preventDefault();
+        // Quitter la conversation précédente
+        if (activeConversation && socket && typeof socket.emit === "function") {
+          socket.emit("leave_conversation", activeConversation.id);
+          console.log("💬 Quitté la conversation:", activeConversation.id);
+        }
 
-  //   if ((!newMessage.trim() && !selectedFile) || !activeConversation || sending)
-  //     return;
+        // Réinitialiser les états avant de charger la nouvelle conversation
+        setMessages([]);
+        setNewMessage("");
+        setSelectedFile(null);
+        setTypingUsers(new Set());
 
-  //   setSending(true);
+        // Mettre à jour la conversation active
+        setActiveConversation(conversation);
 
-  //   try {
-  //     const formData = new FormData();
+        // Rejoindre la nouvelle conversation
+        if (socket && typeof socket.emit === "function") {
+          socket.emit("join_conversation", conversation.id);
+          console.log("💬 Rejoint la conversation:", conversation.id);
+        }
 
-  //     if (selectedFile) {
-  //       formData.append("file", selectedFile);
-  //       formData.append(
-  //         "messageType",
-  //         selectedFile.type.startsWith("image/") ? "image" : "file"
-  //       );
-  //     }
+        // Charger les messages
+        await fetchMessages(conversation.id);
 
-  //     if (newMessage.trim()) {
-  //       formData.append("content", newMessage.trim());
-  //       if (!selectedFile) {
-  //         formData.append("messageType", "text");
-  //       }
-  //     }
+        // Marquer comme lu
+        if (conversation.unreadCount > 0) {
+          await markAsRead(conversation.id);
+        }
+      } catch (error) {
+        console.error("❌ Erreur sélection conversation:", error);
+      }
+    },
+    [activeConversation, socket, fetchMessages, markAsRead]
+  );
 
-  //     const response = await api.post(
-  //       `/api/messages/conversations/${activeConversation.id}/messages`,
-  //       formData,
-  //       {
-  //         headers: {
-  //           "Content-Type": "multipart/form-data",
-  //         },
-  //       }
-  //     );
-
-  //     // Ajouter le message à la liste locale
-  //     setMessages((prev) => [...prev, response.data.data]);
-
-  //     // Réinitialiser
-  //     setNewMessage("");
-  //     setSelectedFile(null);
-
-  //     // Mettre à jour les conversations
-  //     fetchConversations();
-  //   } catch (error) {
-  //     console.error("Erreur envoi message:", error);
-  //   } finally {
-  //     setSending(false);
-  //   }
-  // };
-
+  // ENVOI DE MESSAGE - VERSION AMÉLIORÉE (de votre code)
   const sendMessage = async (e) => {
     e.preventDefault();
 
@@ -357,25 +400,19 @@ const MessagesPage = () => {
       );
 
       // Ajouter le message à la liste locale
-      setMessages((prev) => [...prev, response.data.data]);
+      // setMessages((prev) => [...prev, response.data.data]);
 
       // Réinitialiser
       setNewMessage("");
       setSelectedFile(null);
 
       requestAnimationFrame(() => {
-        messageInputRef.current?.focus({ preventScroll: true });
+        // messageInputRef.current?.focus({ preventScroll: true });
         scrollToBottom();
       });
 
-      // ⚡ Garder le focus et scroller en bas
-      // setTimeout(() => {
-      //   messageInputRef.current?.focus();
-      //   scrollToBottom();
-      // }, 50);
-
       // Mettre à jour les conversations
-      fetchConversations();
+      fetchConversationsOptimized();
     } catch (error) {
       console.error("Erreur envoi message:", error);
     } finally {
@@ -383,46 +420,8 @@ const MessagesPage = () => {
     }
   };
 
-  const markAsRead = async (conversationId) => {
-    try {
-      await api.put(`/api/messages/conversations/${conversationId}/read`);
-      fetchConversations();
-    } catch (error) {
-      console.error("Erreur marquage lecture:", error);
-    }
-  };
-
-  // Gestion de la frappe
-  const handleTyping = useCallback(() => {
-    // if (socket && activeConversation) {
-    //   socket.emit("typing", {
-    //     conversationId: activeConversation.id,
-    //     isTyping: true,
-    //   });
-    if (socket && activeConversation && typeof socket.emit === "function") {
-      socket.emit("typing", {
-        conversationId: activeConversation.id,
-        isTyping: true,
-      });
-
-      clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = setTimeout(() => {
-        // socket.emit("typing", {
-        //   conversationId: activeConversation.id,
-        //   isTyping: false,
-        // });
-        if (socket && typeof socket.emit === "function") {
-          socket.emit("typing", {
-            conversationId: activeConversation.id,
-            isTyping: false,
-          });
-        }
-      }, 1500);
-    }
-  }, [socket, activeConversation]);
-
-  // Recherche d'utilisateurs
-  const searchUsers = async (query) => {
+  // RECHERCHE D'UTILISATEURS
+  const searchUsers = useCallback(async (query) => {
     if (query.length < 2) {
       setSearchResults([]);
       return;
@@ -434,38 +433,44 @@ const MessagesPage = () => {
         params: { q: query, limit: 10 },
       });
       setSearchResults(response.data.users || []);
+      console.log("response", response);
     } catch (error) {
       console.error("Erreur recherche utilisateurs:", error);
     } finally {
       setSearchingUsers(false);
     }
-  };
+  }, []);
 
-  const startNewConversation = async (otherUserId) => {
-    try {
-      const response = await api.post("/api/messages/conversations", {
-        participantId: otherUserId,
-      });
+  const startNewConversation = useCallback(
+    async (otherUserId) => {
+      try {
+        const response = await api.post("/api/messages/conversations", {
+          participantId: otherUserId,
+        });
 
-      const newConversation = response.data.conversation;
-      await fetchConversations();
-      setShowNewConversation(false);
-      setSearchQuery("");
-      setSearchResults([]);
+        const newConversation = response.data.conversation;
+        await fetchConversationsOptimized();
+        setShowNewConversation(false);
+        setSearchQuery("");
+        setSearchResults([]);
 
-      // Sélectionner automatiquement la nouvelle conversation
-      setTimeout(() => {
-        selectConversation(newConversation);
-      }, 100);
-    } catch (error) {
-      console.error("Erreur création conversation:", error);
+        setTimeout(() => {
+          selectConversation(newConversation);
+        }, 100);
+      } catch (error) {
+        console.error("Erreur création conversation:", error);
+      }
+    },
+    [fetchConversationsOptimized, selectConversation]
+  );
+
+  // FONCTIONS UTILITAIRES
+  const scrollToBottom = useCallback(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop =
+        messagesContainerRef.current.scrollHeight;
     }
-  };
-
-  // Fonctions utilitaires
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  }, []);
 
   const formatTime = (date) => {
     return new Date(date).toLocaleTimeString("fr-FR", {
@@ -501,7 +506,51 @@ const MessagesPage = () => {
     return <DocumentIcon className="w-4 h-4" />;
   };
 
-  // Guards
+  // USEEFFECTS OPTIMISÉS
+  useEffect(() => {
+    if (user) {
+      initializeMessaging();
+    }
+  }, [user, initializeMessaging]);
+
+  useEffect(() => {
+    if (socket && user) {
+      return setupSocketListeners();
+    }
+  }, [socket, user, setupSocketListeners]);
+
+  useEffect(() => {
+    const conversationId = searchParams.get("conversation");
+    if (conversationId && conversations.length > 0) {
+      const conversation = conversations.find(
+        (c) => c.id === parseInt(conversationId)
+      );
+      if (conversation) {
+        selectConversation(conversation);
+      }
+    }
+  }, [searchParams, conversations, selectConversation]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  // DEBUG (en développement seulement)
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      console.log("🔍 Debug Socket Info:");
+      console.log("- Socket exists:", !!socket);
+      console.log(
+        "- Socket.emit exists:",
+        !!(socket && typeof socket.emit === "function")
+      );
+      console.log("- Socket.connected:", socket?.connected);
+      console.log("- User:", user?.email);
+      console.log("- Active conversation:", activeConversation?.id);
+    }
+  }, [socket, user, activeConversation]);
+
+  // GUARDS
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -516,14 +565,6 @@ const MessagesPage = () => {
       </div>
     );
   }
-
-  // if (loading) {
-  //   return (
-  //     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-  //       <div className="animate-spin rounded-full h-12 w-12 border-2 border-blue-600 border-t-transparent"></div>
-  //     </div>
-  //   );
-  // }
 
   if (loading) {
     return (
@@ -715,7 +756,7 @@ const MessagesPage = () => {
                                   ? conversation.lastMessage.content
                                   : conversation.lastMessage.messageType ===
                                     "image"
-                                  ? "� Image"
+                                  ? "📷 Image"
                                   : "📎 Fichier"}
                               </p>
                             </div>
@@ -837,14 +878,64 @@ const MessagesPage = () => {
                       </div>
 
                       {/* Actions */}
-                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                        <EllipsisVerticalIcon className="w-5 h-5" />
-                      </button>
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowActions((prev) => !prev)}
+                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          <EllipsisVerticalIcon className="w-5 h-5" />
+                        </button>
+
+                        {showActions && (
+                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-50">
+                            <button
+                              onClick={() => {
+                                setActiveConversation(null); // Fermer la discussion
+                                setShowActions(false);
+                              }}
+                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              Fermer la discussion
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                // log ou API pour supprimer
+                                console.log(
+                                  "Suppression conversation:",
+                                  activeConversation?.id
+                                );
+                                setShowActions(false);
+                              }}
+                              className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-100"
+                            >
+                              Supprimer la discussion
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                // log ou API pour bloquer
+                                console.log(
+                                  "Bloquer:",
+                                  activeConversation?.otherParticipant?.id
+                                );
+                                setShowActions(false);
+                              }}
+                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              Bloquer l’utilisateur
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
                   {/* Zone des messages */}
-                  <div className="flex-1 overflow-y-auto bg-gray-50/30 p-4">
+                  <div
+                    ref={messagesContainerRef}
+                    className="flex-1 overflow-y-auto bg-gray-50/30 p-4"
+                  >
                     {loadingMessages ? (
                       <div className="flex justify-center items-center h-40">
                         <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
@@ -867,8 +958,11 @@ const MessagesPage = () => {
                             formatMessageDate(message.createdAt) !==
                               formatMessageDate(messages[index - 1].createdAt);
 
+                          // Utiliser une clé unique
+                          const uniqueKey = generateMessageKey(message, index);
+
                           return (
-                            <div key={message.id}>
+                            <div key={uniqueKey}>
                               {/* Séparateur de date */}
                               {showDate && (
                                 <div className="text-center my-6">
@@ -941,7 +1035,7 @@ const MessagesPage = () => {
                                     {/* Message fichier */}
                                     {message.messageType === "file" &&
                                       message.attachments && (
-                                        <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                        <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                                           <div className="flex-shrink-0">
                                             {getFileIcon(
                                               message.attachments[0]?.mimetype
@@ -967,9 +1061,9 @@ const MessagesPage = () => {
                                               message.attachments[0]
                                                 ?.originalName
                                             }
-                                            className="flex-shrink-0 text-blue-600 hover:text-blue-800"
+                                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                                           >
-                                            ⬇️
+                                            Télécharger
                                           </a>
                                         </div>
                                       )}
@@ -979,47 +1073,22 @@ const MessagesPage = () => {
                                   <div
                                     className={`flex items-center space-x-2 mt-1 text-xs ${
                                       isOwnMessage
-                                        ? "justify-end"
-                                        : "justify-start"
+                                        ? "justify-end text-gray-500"
+                                        : "text-gray-400"
                                     }`}
                                   >
-                                    <span className="text-gray-500">
-                                      {formatTime(message.createdAt)}
-                                    </span>
-
-                                    {/* Indicateurs de lecture pour ses propres messages */}
+                                    <span>{formatTime(message.createdAt)}</span>
                                     {isOwnMessage && (
-                                      <div className="text-gray-400">
+                                      <>
                                         {message.isRead ? (
-                                          <CheckCheck className="w-4 h-4 text-blue-500" />
+                                          <CheckCheck className="w-3 h-3 text-blue-500" />
                                         ) : (
-                                          <CheckIcon className="w-4 h-4" />
+                                          <CheckIcon className="w-3 h-3" />
                                         )}
-                                      </div>
+                                      </>
                                     )}
                                   </div>
                                 </div>
-
-                                {/* Avatar pour les messages reçus */}
-                                {!isOwnMessage && (
-                                  <div className="order-1 mr-3 mt-auto">
-                                    {activeConversation.otherParticipant
-                                      ?.avatar ? (
-                                      <img
-                                        src={`${process.env.REACT_APP_API_URL}/uploads/avatars/${activeConversation.otherParticipant.avatar}`}
-                                        alt={`${activeConversation.otherParticipant.firstName} ${activeConversation.otherParticipant.lastName}`}
-                                        className="w-8 h-8 rounded-full object-cover"
-                                      />
-                                    ) : (
-                                      <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 text-xs font-semibold">
-                                        {
-                                          activeConversation.otherParticipant
-                                            ?.firstName?.[0]
-                                        }
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
                               </div>
                             </div>
                           );
@@ -1030,135 +1099,88 @@ const MessagesPage = () => {
                   </div>
 
                   {/* Zone de saisie */}
-                  <div className="p-4 bg-white border-t border-gray-200">
-                    {/* Indicateur de fichier sélectionné */}
+                  <div className="p-4 border-t border-gray-200 bg-white">
+                    {/* Aperçu du fichier sélectionné */}
                     {selectedFile && (
-                      <div className="mb-3 p-3 bg-blue-50 rounded-lg flex items-center justify-between">
+                      <div className="mb-3 p-3 bg-blue-50 rounded-xl flex items-center justify-between">
                         <div className="flex items-center space-x-3">
-                          <div className="flex-shrink-0">
-                            {getFileIcon(selectedFile.type)}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {selectedFile.name}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {(selectedFile.size / 1024).toFixed(1)} KB
-                            </p>
-                          </div>
+                          <PaperClipIcon className="w-5 h-5 text-blue-600" />
+                          <span className="text-sm text-gray-900 truncate max-w-xs">
+                            {selectedFile.name}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            ({(selectedFile.size / 1024).toFixed(1)} KB)
+                          </span>
                         </div>
                         <button
                           onClick={() => setSelectedFile(null)}
                           className="text-gray-400 hover:text-gray-600"
                         >
-                          <XMarkIcon className="w-4 h-4" />
+                          <XMarkIcon className="w-5 h-5" />
                         </button>
                       </div>
                     )}
 
-                    {/* Formulaire de saisie */}
                     <form
                       onSubmit={sendMessage}
-                      className="flex items-end space-x-3"
+                      className="flex items-center space-x-3"
                     >
-                      {/* Input principal */}
-                      <div className="flex-1 min-w-0">
-                        <div className="relative">
-                          <textarea
-                            ref={messageInputRef}
-                            value={newMessage}
-                            onChange={(e) => {
-                              setNewMessage(e.target.value);
-                              handleTyping();
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                sendMessage(e);
-                              }
-                            }}
-                            placeholder={`Écrivez votre message à ${activeConversation.otherParticipant?.firstName}...`}
-                            className="w-full max-h-32 min-h-[44px] p-3 pr-20 border border-gray-200 rounded-2xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            rows="1"
-                            style={{
-                              height: "auto",
-                              minHeight: "44px",
-                            }}
-                            onInput={(e) => {
-                              e.target.style.height = "auto";
-                              e.target.style.height =
-                                Math.min(e.target.scrollHeight, 128) + "px";
-                            }}
-                          />
+                      {/* Bouton pièce jointe */}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                        title="Ajouter une pièce jointe"
+                      >
+                        <PaperClipIcon className="w-5 h-5" />
+                      </button>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={(e) =>
+                          setSelectedFile(e.target.files[0] || null)
+                        }
+                        className="hidden"
+                        accept="image/*,.pdf,.doc,.docx,.txt"
+                      />
 
-                          {/* Boutons d'actions dans l'input */}
-                          <div className="absolute right-2 bottom-2 flex items-center space-x-1">
-                            {/* Bouton fichier */}
-                            <button
-                              type="button"
-                              onClick={() => fileInputRef.current?.click()}
-                              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="Joindre un fichier"
-                            >
-                              <PaperClipIcon className="w-4 h-4" />
-                            </button>
+                      {/* Champ de saisie */}
+                      <div className="flex-1 relative">
+                        <input
+                          ref={messageInputRef}
+                          type="text"
+                          value={newMessage}
+                          onChange={handleMessageChange}
+                          placeholder="Écrivez votre message..."
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-12"
+                          disabled={sending}
+                        />
 
-                            {/* Bouton émoji (placeholder) */}
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setShowEmojiPicker(!showEmojiPicker)
-                              }
-                              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="Ajouter un emoji"
-                            >
-                              <FaceSmileIcon className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
+                        {/* Bouton emoji */}
+                        <button
+                          type="button"
+                          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          <FaceSmileIcon className="w-5 h-5" />
+                        </button>
                       </div>
 
                       {/* Bouton d'envoi */}
                       <button
                         type="submit"
                         disabled={
-                          (!newMessage.trim() && !selectedFile) || sending
+                          sending || (!newMessage.trim() && !selectedFile)
                         }
-                        className={`p-3 rounded-2xl transition-all duration-200 ${
-                          (!newMessage.trim() && !selectedFile) || sending
-                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                            : "bg-blue-600 text-white hover:bg-blue-700 transform hover:scale-105 active:scale-95"
-                        }`}
-                        title="Envoyer le message"
+                        className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         {sending ? (
-                          <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                         ) : (
                           <PaperAirplaneIcon className="w-5 h-5" />
                         )}
                       </button>
                     </form>
-
-                    {/* Input file caché */}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*,.pdf,.doc,.docx,.txt"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setSelectedFile(file);
-                        }
-                      }}
-                      className="hidden"
-                    />
-
-                    {/* Raccourcis clavier */}
-                    <div className="mt-2 text-xs text-gray-400 text-center">
-                      <span>
-                        Entrée pour envoyer • Maj+Entrée pour nouvelle ligne
-                      </span>
-                    </div>
                   </div>
                 </>
               )}

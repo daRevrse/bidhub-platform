@@ -161,7 +161,7 @@ const Navbar = () => {
                     >
                       {user.avatar ? (
                         <img
-                          src={user.avatar}
+                          src={`${process.env.REACT_APP_API_URL}${user.avatar}`}
                           alt={user.firstName}
                           className="w-8 h-8 rounded-full object-cover"
                         />

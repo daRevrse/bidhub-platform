@@ -27,7 +27,7 @@ module.exports = (sequelize) => {
           "auction_ending", // Enchère se termine bientôt
           "payment_received", // Paiement reçu
           "payment_required", // Paiement requis
-          "message_received", // Nouveau message
+          // "message_received", // Nouveau message
           "review_received", // Nouvel avis reçu
           "product_approved", // Produit approuvé
           "product_rejected", // Produit rejeté

@@ -17,69 +17,88 @@ class MessageSocketManager {
       console.log(`💬 User connected to messaging: ${socket.id}`);
 
       // Authentification
+      // socket.on("authenticate", async (data) => {
+      //   try {
+      //     let token;
+
+      //     // Gérer les différents formats d'authentification
+      //     if (typeof data === "string") {
+      //       // Format: socket.emit("authenticate", "jwt_token_string")
+      //       token = data;
+      //     } else if (data && typeof data === "object") {
+      //       if (data.token) {
+      //         // Format: socket.emit("authenticate", { token: "jwt_token_string" })
+      //         token = data.token;
+      //       } else if (data.userId) {
+      //         // Format: socket.emit("authenticate", { userId: 123 })
+      //         // C'est pour les notifications, pas les messages
+      //         socket.userId = data.userId;
+      //         console.log(
+      //           `💬 User ${data.userId} connected for messages (userId only)`
+      //         );
+      //         return;
+      //       }
+      //     }
+
+      //     if (!token) {
+      //       socket.emit("auth_error", "Token manquant");
+      //       return;
+      //     }
+
+      //     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      //     socket.userId = decoded.userId;
+      //     socket.userEmail = decoded.email;
+
+      //     // Ajouter à la map des utilisateurs connectés
+      //     this.userSockets.set(socket.userId, socket.id);
+      //     this.onlineUsers.add(socket.userId);
+
+      //     // Rejoindre toutes les conversations de l'utilisateur
+      //     const conversations = await Conversation.findAll({
+      //       where: {
+      //         [Op.or]: [
+      //           { participant1Id: socket.userId },
+      //           { participant2Id: socket.userId },
+      //         ],
+      //       },
+      //     });
+
+      //     conversations.forEach((conv) => {
+      //       socket.join(`conversation_${conv.id}`);
+      //     });
+
+      //     socket.emit("authenticated", { success: true });
+
+      //     // Notifier les autres utilisateurs que cet utilisateur est en ligne
+      //     socket.broadcast.emit("user_online", {
+      //       userId: socket.userId,
+      //       timestamp: new Date(),
+      //     });
+
+      //     console.log(
+      //       `✅ User authenticated for messaging: ${socket.userEmail}`
+      //     );
+      //   } catch (error) {
+      //     console.error("Erreur authentification socket message:", error);
+      //     socket.emit("auth_error", "Token invalide");
+      //   }
+      // });
+
       socket.on("authenticate", async (data) => {
         try {
-          let token;
-
-          // Gérer les différents formats d'authentification
-          if (typeof data === "string") {
-            // Format: socket.emit("authenticate", "jwt_token_string")
-            token = data;
-          } else if (data && typeof data === "object") {
-            if (data.token) {
-              // Format: socket.emit("authenticate", { token: "jwt_token_string" })
-              token = data.token;
-            } else if (data.userId) {
-              // Format: socket.emit("authenticate", { userId: 123 })
-              // C'est pour les notifications, pas les messages
-              socket.userId = data.userId;
-              console.log(
-                `💬 User ${data.userId} connected for messages (userId only)`
-              );
-              return;
-            }
-          }
-
-          if (!token) {
-            socket.emit("auth_error", "Token manquant");
-            return;
+          let token = data;
+          if (typeof data === "object" && data.token) {
+            token = data.token;
           }
 
           const decoded = jwt.verify(token, process.env.JWT_SECRET);
           socket.userId = decoded.userId;
-          socket.userEmail = decoded.email;
-
-          // Ajouter à la map des utilisateurs connectés
           this.userSockets.set(socket.userId, socket.id);
-          this.onlineUsers.add(socket.userId);
-
-          // Rejoindre toutes les conversations de l'utilisateur
-          const conversations = await Conversation.findAll({
-            where: {
-              [Op.or]: [
-                { participant1Id: socket.userId },
-                { participant2Id: socket.userId },
-              ],
-            },
-          });
-
-          conversations.forEach((conv) => {
-            socket.join(`conversation_${conv.id}`);
-          });
 
           socket.emit("authenticated", { success: true });
 
-          // Notifier les autres utilisateurs que cet utilisateur est en ligne
-          socket.broadcast.emit("user_online", {
-            userId: socket.userId,
-            timestamp: new Date(),
-          });
-
-          console.log(
-            `✅ User authenticated for messaging: ${socket.userEmail}`
-          );
+          console.log(`✅ User ${socket.userId} authenticated for messages`);
         } catch (error) {
-          console.error("Erreur authentification socket message:", error);
           socket.emit("auth_error", "Token invalide");
         }
       });

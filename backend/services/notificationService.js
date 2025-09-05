@@ -158,23 +158,23 @@ class NotificationService {
   }
 
   // Nouveau message reçu
-  async notifyNewMessage(
-    recipientId,
-    senderId,
-    senderName,
-    preview,
-    conversationId
-  ) {
-    await this.createNotification({
-      userId: recipientId,
-      type: "message_received",
-      title: "Nouveau message",
-      message: `${senderName}: ${preview}`,
-      data: { senderId, conversationId },
-      priority: "medium",
-      actionUrl: `/messages/${conversationId}`,
-    });
-  }
+  // async notifyNewMessage(
+  //   recipientId,
+  //   senderId,
+  //   senderName,
+  //   preview,
+  //   conversationId
+  // ) {
+  //   await this.createNotification({
+  //     userId: recipientId,
+  //     type: "message_received",
+  //     title: "Nouveau message",
+  //     message: `${senderName}: ${preview}`,
+  //     data: { senderId, conversationId },
+  //     priority: "medium",
+  //     actionUrl: `/messages/${conversationId}`,
+  //   });
+  // }
 
   // Paiement reçu
   async notifyPaymentReceived(sellerId, amount, buyerName, productTitle) {

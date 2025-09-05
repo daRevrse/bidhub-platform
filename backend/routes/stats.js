@@ -27,18 +27,26 @@ router.get("/home", async (req, res) => {
       },
     });
 
-    // Compter les ventes réussies
+    // CORRECTION - Compter les ventes réussies SANS utiliser la relation Payment
+    // Méthode 1 : Compter directement les enchères terminées
     const successfulSales = await Auction.count({
-      where: { status: "ended" },
-      include: [
-        {
-          model: Payment,
-          as: "payments",
-          where: { status: "completed" },
-          required: true,
-        },
-      ],
+      where: {
+        status: "ended",
+        winnerId: { [Op.ne]: null }, // Enchères avec un gagnant
+      },
     });
+
+    // OU Méthode 2 : Utiliser une sous-requête
+    // const successfulSales = await sequelize.query(`
+    //   SELECT COUNT(DISTINCT a.id) as count
+    //   FROM auctions a
+    //   WHERE a.status = 'ended'
+    //   AND EXISTS (
+    //     SELECT 1 FROM payments p
+    //     WHERE p.auctionId = a.id
+    //     AND p.status = 'completed'
+    //   )
+    // `, { type: sequelize.QueryTypes.SELECT });
 
     // Compter le total des offres
     const totalBids = await Bid.count();

@@ -56,6 +56,8 @@ Payment.belongsTo(User, { foreignKey: "buyerId", as: "buyer" });
 Payment.belongsTo(User, { foreignKey: "sellerId", as: "seller" });
 Payment.belongsTo(Auction, { foreignKey: "auctionId", as: "auction" });
 
+Auction.hasMany(Payment, { foreignKey: "auctionId", as: "payments" });
+
 // RELATIONS REVIEW CORRIGÉES (LE PROBLÈME ÉTAIT ICI)
 // Un utilisateur peut donner plusieurs avis (reviewer)
 User.hasMany(Review, {

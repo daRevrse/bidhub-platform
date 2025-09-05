@@ -222,8 +222,9 @@ router.get("/search", async (req, res) => {
     // Recherche par nom
     if (q) {
       whereClause[Op.or] = [
-        { firstName: { [Op.iLike]: `%${q}%` } },
-        { lastName: { [Op.iLike]: `%${q}%` } },
+        { firstName: { [Op.like]: `%${q}%` } },
+        { lastName: { [Op.like]: `%${q}%` } },
+        { email: { [Op.like]: `%${q}%` } },
       ];
     }
 

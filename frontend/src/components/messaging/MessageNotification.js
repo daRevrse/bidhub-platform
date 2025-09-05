@@ -151,8 +151,7 @@ const MessageNotification = () => {
 
       console.log("response.data", response.data);
 
-      const conversationsData =
-        response.data.conversations?.conversations || [];
+      const conversationsData = response.data.conversations || [];
 
       const recentMessagesData = conversationsData
         .filter((conv) => conv.lastMessagePreview) // Utiliser lastMessagePreview au lieu de lastMessage
@@ -296,7 +295,7 @@ const MessageNotification = () => {
                       <div className="flex-shrink-0">
                         {message.otherParticipant?.avatar ? (
                           <img
-                            src={`http://localhost:5000/uploads/avatars/${message.otherParticipant.avatar}`}
+                            src={`${process.env.REACT_APP_API_URL}${message.otherParticipant.avatar}`}
                             alt={`${message.otherParticipant.firstName} ${message.otherParticipant.lastName}`}
                             className="w-10 h-10 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-600"
                           />

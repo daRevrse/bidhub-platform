@@ -89,19 +89,24 @@ app.get("/api/health", (req, res) => {
 });
 
 // CRÉER DES NAMESPACES SÉPARÉS
-const messagesNamespace = io.of("/messages");
-const notificationsNamespace = io.of("/notifications");
+// const messagesNamespace = io.of("/messages");
+// const notificationsNamespace = io.of("/notifications");
 
 // INITIALISER LES GESTIONNAIRES SOCKET.IO
 const auctionSocketManager = new AuctionSocketManager(io);
-const messageSocketManager = new MessageSocketManager(messagesNamespace);
-const notificationSocketManager = new NotificationSocketManager(
-  notificationsNamespace
-);
+// const messageSocketManager = new MessageSocketManager(messagesNamespace);
+// const notificationSocketManager = new NotificationSocketManager(
+//   notificationsNamespace
+// );
+
+const messageSocketManager = new MessageSocketManager(io);
+const notificationSocketManager = new NotificationSocketManager(io);
 
 // CONNECTER LE SERVICE DE NOTIFICATION AU GESTIONNAIRE SOCKET
 notificationService.setSocketManager(notificationSocketManager);
 messagingService.setSocketManager(messageSocketManager);
+
+app.set("messageSocketManager", messageSocketManager);
 
 // Fonction pour créer les paramètres par défaut
 const createDefaultSettings = async () => {
