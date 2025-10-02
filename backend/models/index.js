@@ -1,4 +1,4 @@
-// backend/models/index.js - VERSION COMPLÈTEMENT CORRIGÉE
+// backend/models/index.js - VERSION CORRIGÉE COMPLÈTE
 const { Sequelize } = require("sequelize");
 const dotenv = require("dotenv");
 
@@ -30,11 +30,15 @@ const Setting = require("./Setting")(sequelize);
 const AuditLog = require("./AuditLog")(sequelize);
 const UserFavorite = require("./UserFavorite")(sequelize);
 const AuctionView = require("./AuctionView")(sequelize);
-
-// NOUVEAU: Import du modèle Notification
 const Notification = require("./Notification")(sequelize);
 
-// Relations de base Product/User
+// NOUVEAUX MODÈLES
+const Category = require("./Category")(sequelize);
+const SellerRequest = require("./SellerRequest")(sequelize);
+
+// ======= RELATIONS DE BASE =======
+
+// Relations User/Product
 User.hasMany(Product, { foreignKey: "sellerId", as: "products" });
 Product.belongsTo(User, { foreignKey: "sellerId", as: "seller" });
 
@@ -58,51 +62,37 @@ Payment.belongsTo(Auction, { foreignKey: "auctionId", as: "auction" });
 
 Auction.hasMany(Payment, { foreignKey: "auctionId", as: "payments" });
 
-// RELATIONS REVIEW CORRIGÉES (LE PROBLÈME ÉTAIT ICI)
-// Un utilisateur peut donner plusieurs avis (reviewer)
+// ======= RELATIONS REVIEW =======
 User.hasMany(Review, {
   foreignKey: "reviewerId",
   as: "givenReviews",
   onDelete: "CASCADE",
 });
 
-// Un utilisateur peut recevoir plusieurs avis (reviewee - CORRECTION: revieweeId au lieu de reviewedUserId)
 User.hasMany(Review, {
-  foreignKey: "revieweeId", // ← CHANGÉ DE reviewedUserId à revieweeId
+  foreignKey: "revieweeId",
   as: "receivedReviews",
   onDelete: "CASCADE",
 });
 
-// Relation inverse : un avis appartient à un revieweur
 Review.belongsTo(User, {
   foreignKey: "reviewerId",
   as: "reviewer",
 });
 
-// Relation inverse : un avis appartient à un reviewé (CORRECTION)
 Review.belongsTo(User, {
-  foreignKey: "revieweeId", // ← CHANGÉ DE reviewedUserId à revieweeId
-  as: "reviewee", // ← CHANGÉ DE reviewedUser à reviewee
+  foreignKey: "revieweeId",
+  as: "reviewee",
 });
 
-// Une enchère peut avoir plusieurs avis
-Auction.hasMany(Review, {
-  foreignKey: "auctionId",
-  as: "reviews",
-  onDelete: "CASCADE",
-});
+Auction.hasMany(Review, { foreignKey: "auctionId", as: "reviews" });
+Review.belongsTo(Auction, { foreignKey: "auctionId", as: "auction" });
 
-// Un avis appartient à une enchère
-Review.belongsTo(Auction, {
-  foreignKey: "auctionId",
-  as: "auction",
-});
-
-// Relations UserReputation
+// ======= RELATIONS REPUTATION =======
 User.hasOne(UserReputation, { foreignKey: "userId", as: "reputation" });
 UserReputation.belongsTo(User, { foreignKey: "userId", as: "user" });
 
-// Relations Badge (Many-to-Many)
+// ======= RELATIONS BADGE =======
 User.belongsToMany(Badge, {
   through: "UserBadges",
   foreignKey: "userId",
@@ -116,7 +106,7 @@ Badge.belongsToMany(User, {
   as: "users",
 });
 
-// Relations Conversation
+// ======= RELATIONS CONVERSATION/MESSAGE =======
 User.hasMany(Conversation, {
   foreignKey: "participant1Id",
   as: "conversationsAsParticipant1",
@@ -137,41 +127,78 @@ Conversation.belongsTo(User, {
 Auction.hasMany(Conversation, { foreignKey: "auctionId", as: "conversations" });
 Conversation.belongsTo(Auction, { foreignKey: "auctionId", as: "auction" });
 
-// Relations Message
-User.hasMany(Message, { foreignKey: "senderId", as: "messages" });
+User.hasMany(Message, { foreignKey: "senderId", as: "sentMessages" });
 Message.belongsTo(User, { foreignKey: "senderId", as: "sender" });
 
-Conversation.hasMany(Message, { foreignKey: "conversationId", as: "messages" });
+Conversation.hasMany(Message, {
+  foreignKey: "conversationId",
+  as: "messages",
+});
 Message.belongsTo(Conversation, {
   foreignKey: "conversationId",
   as: "conversation",
 });
 
-// Relation pour les réponses aux messages
-Message.hasMany(Message, { foreignKey: "replyToId", as: "replies" });
-Message.belongsTo(Message, { foreignKey: "replyToId", as: "replyTo" });
-
-// Relations AuditLog
-User.hasMany(AuditLog, { foreignKey: "userId", as: "auditLogs" });
-AuditLog.belongsTo(User, { foreignKey: "userId", as: "user" });
-
-// Relations UserFavorite
-User.hasMany(UserFavorite, { foreignKey: "userId", as: "favorites" });
+// ======= RELATIONS FAVORITES (CORRIGÉES) =======
+User.hasMany(UserFavorite, { foreignKey: "userId", as: "userFavorites" });
 UserFavorite.belongsTo(User, { foreignKey: "userId", as: "user" });
 
-Auction.hasMany(UserFavorite, { foreignKey: "auctionId", as: "favoritedBy" });
+Auction.hasMany(UserFavorite, {
+  foreignKey: "auctionId",
+  as: "auctionFavorites",
+});
 UserFavorite.belongsTo(Auction, { foreignKey: "auctionId", as: "auction" });
 
-// Relations AuctionView
-User.hasMany(AuctionView, { foreignKey: "userId", as: "views" });
+// ======= RELATIONS AUCTION VIEWS (CORRIGÉES) =======
+User.hasMany(AuctionView, { foreignKey: "userId", as: "userViews" });
 AuctionView.belongsTo(User, { foreignKey: "userId", as: "user" });
 
-Auction.hasMany(AuctionView, { foreignKey: "auctionId", as: "viewedBy" });
+Auction.hasMany(AuctionView, { foreignKey: "auctionId", as: "auctionViews" });
 AuctionView.belongsTo(Auction, { foreignKey: "auctionId", as: "auction" });
 
-// NOUVELLES RELATIONS - Notification
+// ======= RELATIONS NOTIFICATION =======
 User.hasMany(Notification, { foreignKey: "userId", as: "notifications" });
 Notification.belongsTo(User, { foreignKey: "userId", as: "user" });
+
+// ======= NOUVELLES RELATIONS CATEGORY (CORRIGÉES) =======
+Category.hasMany(Category, {
+  foreignKey: "parentId",
+  as: "children",
+  onDelete: "SET NULL",
+});
+Category.belongsTo(Category, {
+  foreignKey: "parentId",
+  as: "parent",
+});
+
+// Relations Product/Category - ATTENTION: nom d'association modifié pour éviter conflit
+Category.hasMany(Product, { foreignKey: "categoryId", as: "products" });
+Product.belongsTo(Category, {
+  foreignKey: "categoryId",
+  as: "productCategory",
+});
+
+// ======= RELATIONS SELLER REQUEST =======
+User.hasMany(SellerRequest, { foreignKey: "userId", as: "sellerRequests" });
+SellerRequest.belongsTo(User, { foreignKey: "userId", as: "user" });
+
+User.hasMany(SellerRequest, {
+  foreignKey: "reviewedBy",
+  as: "reviewedSellerRequests",
+});
+SellerRequest.belongsTo(User, {
+  foreignKey: "reviewedBy",
+  as: "reviewer",
+});
+
+// ======= RELATIONS TRAÇABILITÉ =======
+User.hasMany(Setting, { foreignKey: "updatedBy", as: "updatedSettings" });
+Setting.belongsTo(User, { foreignKey: "updatedBy", as: "updater" });
+
+User.hasMany(Category, { foreignKey: "createdBy", as: "createdCategories" });
+User.hasMany(Category, { foreignKey: "updatedBy", as: "updatedCategories" });
+Category.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+Category.belongsTo(User, { foreignKey: "updatedBy", as: "updater" });
 
 module.exports = {
   sequelize,
@@ -189,5 +216,7 @@ module.exports = {
   AuditLog,
   UserFavorite,
   AuctionView,
-  Notification, // NOUVEAU
+  Notification,
+  Category,
+  SellerRequest,
 };

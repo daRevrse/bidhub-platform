@@ -1,6 +1,7 @@
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import AdminLayout from "../admin/AdminLayout";
 
 const PrivateRoute = ({ children, roles = [] }) => {
   const { user, loading } = useAuth();
@@ -69,6 +70,10 @@ const PrivateRoute = ({ children, roles = [] }) => {
         </div>
       </div>
     );
+  }
+
+  if (user.role === "admin") {
+    return <AdminLayout>{children}</AdminLayout>;
   }
 
   return children;

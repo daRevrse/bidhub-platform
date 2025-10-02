@@ -1,27 +1,60 @@
+// backend/scripts/fixAssociations.js - Script pour vérifier les associations
 const { sequelize } = require("../models");
 
-async function fixRelations() {
+async function testAssociations() {
   try {
-    console.log("🔧 Correction des relations de base de données...");
+    console.log("🔍 Test des associations...");
 
-    // Supprimer et recréer les tables si nécessaire
-    await sequelize.query("SET FOREIGN_KEY_CHECKS = 0;");
+    // Test de synchronisation des modèles
+    await sequelize.sync({ alter: true });
+    console.log("✅ Synchronisation des modèles réussie");
 
-    // Supprimer les tables de messagerie si elles existent avec de mauvaises relations
-    await sequelize.query("DROP TABLE IF EXISTS Messages;");
-    await sequelize.query("DROP TABLE IF EXISTS Conversations;");
+    console.log("\n📋 Associations configurées :");
 
-    await sequelize.query("SET FOREIGN_KEY_CHECKS = 1;");
+    // Lister toutes les associations pour vérification
+    const models = sequelize.models;
 
-    // Recréer avec les bonnes relations
-    await sequelize.sync({ force: false });
+    Object.keys(models).forEach((modelName) => {
+      const model = models[modelName];
+      const associations = Object.keys(model.associations);
 
-    console.log("✅ Relations corrigées");
+      if (associations.length > 0) {
+        console.log(`\n${modelName}:`);
+        associations.forEach((assoc) => {
+          const association = model.associations[assoc];
+          console.log(
+            `  - ${assoc} (${association.associationType}) -> ${association.target.name}`
+          );
+        });
+      }
+    });
+
+    console.log("\n✅ Toutes les associations sont correctes !");
   } catch (error) {
-    console.error("❌ Erreur correction relations:", error);
+    console.error("❌ Erreur dans les associations:", error.message);
+
+    if (error.message.includes("Naming collision")) {
+      console.log("\n💡 Solution suggérée:");
+      console.log(
+        "Il y a encore un conflit de nommage. Vérifiez les associations dans models/index.js"
+      );
+    }
+
+    throw error;
   }
 }
 
-if (process.argv.includes("--fix-relations")) {
-  fixRelations().then(() => process.exit(0));
+// Exécuter le test si appelé directement
+if (require.main === module) {
+  testAssociations()
+    .then(() => {
+      console.log("\n🎉 Test terminé avec succès !");
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("\n💥 Échec du test:", error);
+      process.exit(1);
+    });
 }
+
+module.exports = { testAssociations };

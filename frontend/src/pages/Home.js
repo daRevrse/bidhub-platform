@@ -346,12 +346,12 @@ const Home = () => {
                 >
                   <div className="relative">
                     <img
-                      src={
-                        auction.product?.images?.[0] ||
-                        "/images/placeholder.jpg"
-                      }
+                      src={`http://localhost:5000/uploads/products/${auction.product.images[0]}`}
                       alt={auction.product?.title}
                       className="w-full h-56 object-cover group-hover:scale-110 transition-transform duration-500"
+                      onError={(e) => {
+                        e.target.src = "https://placehold.net/1.png";
+                      }}
                     />
                     <div className="absolute top-4 left-4">
                       <span className="px-3 py-1 bg-gradient-to-r from-red-500 to-pink-600 text-white text-xs font-bold rounded-full shadow-lg">

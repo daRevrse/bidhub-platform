@@ -1,4 +1,4 @@
-// frontend/src/App.js - VERSION CORRIGÉE
+// frontend/src/App.js - VERSION MISE À JOUR AVEC NOUVELLES FONCTIONNALITÉS
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "./components/layout/Navbar";
@@ -25,12 +25,19 @@ import NotificationsPage from "./pages/NotificationsPage";
 import PrivateRoute from "./components/auth/PrivateRoute";
 import PublicRoute from "./components/auth/PublicRoute";
 
-// Composants admin
+// Composants admin existants
 import AuctionManagement from "./components/admin/AuctionManagement";
 import Reports from "./components/admin/Reports";
 import UserManagement from "./components/admin/UserManagement";
 import AdminSettings from "./components/admin/AdminSettings";
 import AuditLogs from "./components/admin/AuditLogs";
+
+// NOUVEAUX COMPOSANTS ADMIN
+import SellerRequestsManagement from "./components/admin/SellerRequestsManagement";
+import CategoriesManagement from "./components/admin/CategoriesManagement";
+
+// NOUVEAU COMPOSANT VENDEUR
+import SellerRequestForm from "./components/seller/SellerRequestForm";
 
 // Pages d'information
 import HowItWorks from "./pages/info/HowItWorks";
@@ -123,6 +130,16 @@ function App() {
                   }
                 />
 
+                {/* NOUVELLE ROUTE - Demande de vendeur */}
+                <Route
+                  path="/become-seller"
+                  element={
+                    <PrivateRoute roles={["user"]}>
+                      <SellerRequestForm />
+                    </PrivateRoute>
+                  }
+                />
+
                 {/* Routes pour vendeurs et admins */}
                 <Route
                   path="/create-product"
@@ -202,6 +219,26 @@ function App() {
                     </PrivateRoute>
                   }
                 />
+
+                {/* NOUVELLES ROUTES ADMIN */}
+                <Route
+                  path="/admin/seller-requests"
+                  element={
+                    <PrivateRoute roles={["admin"]}>
+                      <SellerRequestsManagement />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/admin/categories"
+                  element={
+                    <PrivateRoute roles={["admin"]}>
+                      <CategoriesManagement />
+                    </PrivateRoute>
+                  }
+                />
+
+                {/* Routes admin existantes */}
                 <Route
                   path="/admin/reports"
                   element={
@@ -255,6 +292,7 @@ function App() {
                 />
               </Routes>
             </main>
+
             <Footer />
 
             {/* Toast notifications */}

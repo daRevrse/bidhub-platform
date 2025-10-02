@@ -3,9 +3,12 @@ import { Link, useParams } from "react-router-dom";
 import axios from "axios";
 import UserReputation from "../../components/reputation/UserReputation";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import { useAuth } from "../../contexts/AuthContext";
+import { Tag } from "lucide-react";
 
 const UserProfile = () => {
   const { userId } = useParams();
+  const { user: userAuth } = useAuth();
   const [user, setUser] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,13 +26,23 @@ const UserProfile = () => {
       const userResponse = await axios.get(
         `http://localhost:5000/api/users/public/${userId}`
       );
+
       setUser(userResponse.data);
 
       // Récupérer les produits actifs de l'utilisateur
       const productsResponse = await axios.get(
         `http://localhost:5000/api/products?sellerId=${userId}&status=active`
       );
-      setProducts(productsResponse.data.products || []);
+
+      console.log("role", userAuth.role);
+
+      if (userAuth.role === "admin" || userAuth.role === "seller") {
+        setProducts(userResponse.data.products || []);
+      } else {
+        setProducts(productsResponse.data.products || []);
+      }
+
+      console.log("products", products);
     } catch (error) {
       console.error("Erreur chargement profil:", error);
     } finally {
@@ -202,6 +215,11 @@ const UserProfile = () => {
                             <p className="text-primary-600 font-semibold">
                               {formatPrice(product.auction.currentPrice)}
                             </p>
+                          )}
+                          {product.status === "draft" && (
+                            <span className="text-sm text-gray-500">
+                              Brouillon
+                            </span>
                           )}
                         </div>
                       </Link>

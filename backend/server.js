@@ -60,7 +60,8 @@ app.use("/api/users", require("./routes/users"));
 app.use("/api/payments", require("./routes/payments"));
 app.use("/api/reviews", require("./routes/reviews"));
 app.use("/api/messages", require("./routes/messages"));
-
+app.use("/api/categories", require("./routes/categories"));
+app.use("/api/seller-requests", require("./routes/sellerRequests"));
 // Nouvelle route statistiques (publique)
 app.use("/api/stats", require("./routes/stats"));
 

@@ -62,6 +62,12 @@ const Navbar = () => {
       roles: ["seller", "admin"],
     },
     {
+      name: "Devenir vendeur",
+      href: "/become-seller",
+      public: false,
+      roles: ["user"],
+    },
+    {
       name: "Avis",
       href: "/reviews",
       public: false,

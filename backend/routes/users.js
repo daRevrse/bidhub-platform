@@ -83,7 +83,11 @@ router.get("/public/:userId", async (req, res) => {
     let products = [];
     try {
       const productsResult = await Product.findAll({
-        where: { sellerId: userId, status: "active" },
+        where: {
+          sellerId: userId,
+          //  status: "active"
+          status: { [Op.in]: ["active", "draft"] },
+        },
         limit: 6,
         order: [["createdAt", "DESC"]],
         include: [

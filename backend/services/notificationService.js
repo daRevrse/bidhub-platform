@@ -176,6 +176,152 @@ class NotificationService {
   //   });
   // }
 
+  async notifyAdmins({
+    type,
+    title,
+    message,
+    data = null,
+    priority = "medium",
+    actionUrl = null,
+    imageUrl = null,
+    expiresAt = null,
+  }) {
+    try {
+      const { User } = require("../models");
+
+      // Récupérer tous les administrateurs
+      const admins = await User.findAll({
+        where: { role: "admin", isActive: true },
+        attributes: ["id"],
+      });
+
+      // Créer une notification pour chaque admin
+      const notifications = [];
+      for (const admin of admins) {
+        const notification = await this.createNotification({
+          userId: admin.id,
+          type,
+          title,
+          message,
+          data,
+          priority,
+          actionUrl,
+          imageUrl,
+          expiresAt,
+        });
+        notifications.push(notification);
+      }
+
+      console.log(
+        `📢 ${notifications.length} administrateurs notifiés: ${title}`
+      );
+      return notifications;
+    } catch (error) {
+      console.error("Erreur notification administrateurs:", error);
+      throw error;
+    }
+  }
+
+  async notifySellers({
+    type,
+    title,
+    message,
+    data = null,
+    priority = "medium",
+    actionUrl = null,
+    imageUrl = null,
+    expiresAt = null,
+  }) {
+    try {
+      const { User } = require("../models");
+
+      // Récupérer tous les vendeurs actifs
+      const sellers = await User.findAll({
+        where: {
+          role: "seller",
+          isActive: true,
+          isVerified: true,
+        },
+        attributes: ["id"],
+      });
+
+      // Créer une notification pour chaque vendeur
+      const notifications = [];
+      for (const seller of sellers) {
+        const notification = await this.createNotification({
+          userId: seller.id,
+          type,
+          title,
+          message,
+          data,
+          priority,
+          actionUrl,
+          imageUrl,
+          expiresAt,
+        });
+        notifications.push(notification);
+      }
+
+      console.log(`📢 ${notifications.length} vendeurs notifiés: ${title}`);
+      return notifications;
+    } catch (error) {
+      console.error("Erreur notification vendeurs:", error);
+      throw error;
+    }
+  }
+
+  async notifyUsersByRole({
+    roles = [],
+    type,
+    title,
+    message,
+    data = null,
+    priority = "medium",
+    actionUrl = null,
+    imageUrl = null,
+    expiresAt = null,
+  }) {
+    try {
+      const { User } = require("../models");
+
+      // Récupérer les utilisateurs par rôles
+      const users = await User.findAll({
+        where: {
+          role: roles,
+          isActive: true,
+        },
+        attributes: ["id", "role"],
+      });
+
+      // Créer une notification pour chaque utilisateur
+      const notifications = [];
+      for (const user of users) {
+        const notification = await this.createNotification({
+          userId: user.id,
+          type,
+          title,
+          message,
+          data,
+          priority,
+          actionUrl,
+          imageUrl,
+          expiresAt,
+        });
+        notifications.push(notification);
+      }
+
+      console.log(
+        `📢 ${notifications.length} utilisateurs notifiés (${roles.join(
+          ", "
+        )}): ${title}`
+      );
+      return notifications;
+    } catch (error) {
+      console.error("Erreur notification utilisateurs par rôle:", error);
+      throw error;
+    }
+  }
+
   // Paiement reçu
   async notifyPaymentReceived(sellerId, amount, buyerName, productTitle) {
     await this.createNotification({

@@ -12,6 +12,7 @@ module.exports = (sequelize) => {
       category: {
         type: DataTypes.STRING(50),
         allowNull: false,
+        defaultValue: "general",
         comment: "Catégorie de paramètres (general, auction, payment, etc.)",
       },
       key: {
