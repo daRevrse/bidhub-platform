@@ -54,29 +54,186 @@ export const NotificationProvider = ({ children }) => {
   //   }
   // }, [socket, user]);
 
+  // useEffect(() => {
+  //   if (socket?.notifications && user) {
+  //     console.log("🔔 Authenticating notification socket...");
+  //     socket.notifications.emit("authenticate", { userId: user.id });
+  //   }
+  // }, [socket, user]);
+
   useEffect(() => {
-    if (socket?.notifications && user) {
-      console.log("🔔 Authenticating notification socket...");
-      socket.notifications.emit("authenticate", { userId: user.id });
+    if (socket && user) {
+      console.log("🔔 Authentification socket notifications...");
+
+      // IMPORTANT: Authentifier immédiatement
+      socket.emit("authenticate", { userId: user.id });
+
+      // Demander le count initial
+      socket.emit("get_unread_count");
     }
   }, [socket, user]);
 
   // Écouter les notifications en temps réel
+  // useEffect(() => {
+  //   // if (!socket) return;
+  //   if (!socket?.notifications) return;
+
+  //   const notificationSocket = socket.notifications;
+
+  //   console.log("🔔 Setting up notification listeners...");
+
+  //   // Nouvelle notification reçue
+  //   const handleNewNotification = (notification) => {
+  //     console.log("🔔 New notification received:", notification);
+  //     setNotifications((prev) => [notification, ...prev]);
+  //     setUnreadCount((prev) => prev + 1);
+
+  //     // Toast notification avec type approprié
+  //     const toastOptions = {
+  //       duration: 5000,
+  //       position: "top-right",
+  //     };
+
+  //     switch (notification.priority) {
+  //       case "urgent":
+  //         toast.error(notification.title, {
+  //           ...toastOptions,
+  //           description: notification.message,
+  //           duration: 8000,
+  //         });
+  //         break;
+  //       case "high":
+  //         toast.success(notification.title, {
+  //           ...toastOptions,
+  //           description: notification.message,
+  //           duration: 6000,
+  //         });
+  //         break;
+  //       default:
+  //         toast(notification.title, {
+  //           ...toastOptions,
+  //           description: notification.message,
+  //           icon: getNotificationIcon(notification.type),
+  //         });
+  //     }
+  //   };
+
+  //   // Notifications non lues à la connexion
+  //   const handleUnreadNotifications = (data) => {
+  //     console.log("🔔 Unread notifications received:", data);
+  //     setNotifications(data.notifications || []);
+  //     setUnreadCount(data.count || 0);
+  //   };
+
+  //   // Notification marquée comme lue
+  //   const handleNotificationRead = ({ notificationId }) => {
+  //     console.log("🔔 Notification marked as read:", notificationId);
+  //     setNotifications((prev) =>
+  //       prev.map((n) =>
+  //         n.id === notificationId
+  //           ? { ...n, isRead: true, readAt: new Date() }
+  //           : n
+  //       )
+  //     );
+  //     setUnreadCount((prev) => Math.max(0, prev - 1));
+  //   };
+
+  //   // Toutes marquées comme lues
+  //   const handleAllNotificationsRead = () => {
+  //     console.log("🔔 All notifications marked as read");
+  //     setNotifications((prev) =>
+  //       prev.map((n) => ({ ...n, isRead: true, readAt: new Date() }))
+  //     );
+  //     setUnreadCount(0);
+  //   };
+
+  //   // Notification système
+  //   const handleSystemNotification = (notification) => {
+  //     console.log("🔔 System notification received:", notification);
+  //     toast.info(notification.title, {
+  //       description: notification.message,
+  //       duration: 8000,
+  //       position: "top-center",
+  //       icon: "🔔",
+  //     });
+  //   };
+
+  //   // Notification de salle (enchères, etc.)
+  //   const handleRoomNotification = (notification) => {
+  //     console.log("🔔 Room notification received:", notification);
+  //     toast.info(notification.title, {
+  //       description: notification.message,
+  //       duration: 4000,
+  //     });
+  //   };
+
+  //   // Attacher les listeners
+  //   // socket.on("new_notification", handleNewNotification);
+  //   // socket.on("unread_notifications", handleUnreadNotifications);
+  //   // socket.on("notification_marked_read", handleNotificationRead);
+  //   // socket.on("all_notifications_marked_read", handleAllNotificationsRead);
+  //   // socket.on("system_notification", handleSystemNotification);
+  //   // socket.on("room_notification", handleRoomNotification);
+
+  //   notificationSocket.on("new_notification", handleNewNotification);
+  //   notificationSocket.on("unread_notifications", handleUnreadNotifications);
+  //   notificationSocket.on("notification_marked_read", handleNotificationRead);
+  //   notificationSocket.on(
+  //     "all_notifications_marked_read",
+  //     handleAllNotificationsRead
+  //   );
+  //   notificationSocket.on("system_notification", handleSystemNotification);
+  //   notificationSocket.on("room_notification", handleRoomNotification);
+
+  //   // Cleanup
+  //   return () => {
+  //     console.log("🔔 Cleaning up notification listeners...");
+  //     // socket.off("new_notification", handleNewNotification);
+  //     // socket.off("unread_notifications", handleUnreadNotifications);
+  //     // socket.off("notification_marked_read", handleNotificationRead);
+  //     // socket.off("all_notifications_marked_read", handleAllNotificationsRead);
+  //     // socket.off("system_notification", handleSystemNotification);
+  //     // socket.off("room_notification", handleRoomNotification);
+
+  //     notificationSocket.off("new_notification", handleNewNotification);
+  //     notificationSocket.off("unread_notifications", handleUnreadNotifications);
+  //     notificationSocket.off(
+  //       "notification_marked_read",
+  //       handleNotificationRead
+  //     );
+  //     notificationSocket.off(
+  //       "all_notifications_marked_read",
+  //       handleAllNotificationsRead
+  //     );
+  //     notificationSocket.off("system_notification", handleSystemNotification);
+  //     notificationSocket.off("room_notification", handleRoomNotification);
+  //   };
+  // }, [socket]);
+
   useEffect(() => {
-    // if (!socket) return;
-    if (!socket?.notifications) return;
+    if (!socket || !user) return;
 
-    const notificationSocket = socket.notifications;
+    console.log("🔔 Configuration listeners notifications");
 
-    console.log("🔔 Setting up notification listeners...");
+    // Handler pour le count mis à jour
+    const handleUnreadCount = (data) => {
+      console.log("🔔 Unread count reçu:", data);
+      setUnreadCount(data.count || 0);
+    };
 
-    // Nouvelle notification reçue
     const handleNewNotification = (notification) => {
-      console.log("🔔 New notification received:", notification);
+      console.log("🔔 Nouvelle notification reçue:", notification);
+
+      // NE PAS AJOUTER SI C'EST UNE NOTIF DE MESSAGE
+      if (notification.type === "new_message") {
+        console.log("🔔 Ignorée (notification de message)");
+        return;
+      }
+
       setNotifications((prev) => [notification, ...prev]);
       setUnreadCount((prev) => prev + 1);
 
-      // Toast notification avec type approprié
+      // Toast selon priorité
       const toastOptions = {
         duration: 5000,
         position: "top-right",
@@ -106,16 +263,8 @@ export const NotificationProvider = ({ children }) => {
       }
     };
 
-    // Notifications non lues à la connexion
-    const handleUnreadNotifications = (data) => {
-      console.log("🔔 Unread notifications received:", data);
-      setNotifications(data.notifications || []);
-      setUnreadCount(data.count || 0);
-    };
-
-    // Notification marquée comme lue
     const handleNotificationRead = ({ notificationId }) => {
-      console.log("🔔 Notification marked as read:", notificationId);
+      console.log("🔔 Notification marquée comme lue:", notificationId);
       setNotifications((prev) =>
         prev.map((n) =>
           n.id === notificationId
@@ -126,77 +275,28 @@ export const NotificationProvider = ({ children }) => {
       setUnreadCount((prev) => Math.max(0, prev - 1));
     };
 
-    // Toutes marquées comme lues
     const handleAllNotificationsRead = () => {
-      console.log("🔔 All notifications marked as read");
+      console.log("🔔 Toutes marquées comme lues");
       setNotifications((prev) =>
         prev.map((n) => ({ ...n, isRead: true, readAt: new Date() }))
       );
       setUnreadCount(0);
     };
 
-    // Notification système
-    const handleSystemNotification = (notification) => {
-      console.log("🔔 System notification received:", notification);
-      toast.info(notification.title, {
-        description: notification.message,
-        duration: 8000,
-        position: "top-center",
-        icon: "🔔",
-      });
-    };
+    // ATTACHER LES LISTENERS
+    socket.on("new_notification", handleNewNotification);
+    socket.on("unread_count", handleUnreadCount);
+    socket.on("notification_marked_read", handleNotificationRead);
+    socket.on("all_notifications_marked_read", handleAllNotificationsRead);
 
-    // Notification de salle (enchères, etc.)
-    const handleRoomNotification = (notification) => {
-      console.log("🔔 Room notification received:", notification);
-      toast.info(notification.title, {
-        description: notification.message,
-        duration: 4000,
-      });
-    };
-
-    // Attacher les listeners
-    // socket.on("new_notification", handleNewNotification);
-    // socket.on("unread_notifications", handleUnreadNotifications);
-    // socket.on("notification_marked_read", handleNotificationRead);
-    // socket.on("all_notifications_marked_read", handleAllNotificationsRead);
-    // socket.on("system_notification", handleSystemNotification);
-    // socket.on("room_notification", handleRoomNotification);
-
-    notificationSocket.on("new_notification", handleNewNotification);
-    notificationSocket.on("unread_notifications", handleUnreadNotifications);
-    notificationSocket.on("notification_marked_read", handleNotificationRead);
-    notificationSocket.on(
-      "all_notifications_marked_read",
-      handleAllNotificationsRead
-    );
-    notificationSocket.on("system_notification", handleSystemNotification);
-    notificationSocket.on("room_notification", handleRoomNotification);
-
-    // Cleanup
+    // CLEANUP
     return () => {
-      console.log("🔔 Cleaning up notification listeners...");
-      // socket.off("new_notification", handleNewNotification);
-      // socket.off("unread_notifications", handleUnreadNotifications);
-      // socket.off("notification_marked_read", handleNotificationRead);
-      // socket.off("all_notifications_marked_read", handleAllNotificationsRead);
-      // socket.off("system_notification", handleSystemNotification);
-      // socket.off("room_notification", handleRoomNotification);
-
-      notificationSocket.off("new_notification", handleNewNotification);
-      notificationSocket.off("unread_notifications", handleUnreadNotifications);
-      notificationSocket.off(
-        "notification_marked_read",
-        handleNotificationRead
-      );
-      notificationSocket.off(
-        "all_notifications_marked_read",
-        handleAllNotificationsRead
-      );
-      notificationSocket.off("system_notification", handleSystemNotification);
-      notificationSocket.off("room_notification", handleRoomNotification);
+      socket.off("new_notification", handleNewNotification);
+      socket.off("unread_count", handleUnreadCount);
+      socket.off("notification_marked_read", handleNotificationRead);
+      socket.off("all_notifications_marked_read", handleAllNotificationsRead);
     };
-  }, [socket]);
+  }, [socket, user]);
 
   // Fonctions utilitaires
   const getNotificationIcon = (type) => {
@@ -217,34 +317,79 @@ export const NotificationProvider = ({ children }) => {
   };
 
   // API calls
-  const fetchNotifications = async (page = 1, limit = 20) => {
+  // const fetchNotifications = async (page = 1, limit = 20) => {
+  //   if (!user) return;
+
+  //   setLoading(true);
+  //   try {
+  //     const response = await api.get(
+  //       `/api/notifications?page=${page}&limit=${limit}`
+  //     );
+  //     if (page === 1) {
+  //       setNotifications(response.data.notifications);
+  //     } else {
+  //       setNotifications((prev) => [...prev, ...response.data.notifications]);
+  //     }
+  //     return response.data;
+  //   } catch (error) {
+  //     console.error("Erreur chargement notifications:", error);
+  //     toast.error("Erreur lors du chargement des notifications");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+  const fetchNotifications = async () => {
     if (!user) return;
 
     setLoading(true);
     try {
-      const response = await api.get(
-        `/api/notifications?page=${page}&limit=${limit}`
+      // ✅ Fetch SANS les notifications de messages
+      const response = await api.get("/api/notifications", {
+        params: {
+          page: 1,
+          limit: 50,
+          // Ne pas spécifier de type = récupère tout SAUF new_message (géré backend)
+        },
+      });
+
+      const notificationsData = response.data.notifications || [];
+
+      // ✅ DOUBLE VÉRIFICATION: Filtrer côté client aussi
+      const filteredNotifications = notificationsData.filter(
+        (n) => n.type !== "new_message"
       );
-      if (page === 1) {
-        setNotifications(response.data.notifications);
-      } else {
-        setNotifications((prev) => [...prev, ...response.data.notifications]);
+
+      setNotifications(filteredNotifications);
+
+      if (typeof response.data.unreadCount === "number") {
+        setUnreadCount(response.data.unreadCount);
       }
-      return response.data;
     } catch (error) {
       console.error("Erreur chargement notifications:", error);
-      toast.error("Erreur lors du chargement des notifications");
     } finally {
       setLoading(false);
     }
   };
+
+  // const fetchUnreadCount = async () => {
+  //   if (!user) return;
+
+  //   try {
+  //     const response = await api.get("/api/notifications/unread-count");
+  //     setUnreadCount(response.data.unreadCount);
+  //   } catch (error) {
+  //     console.error("Erreur comptage notifications:", error);
+  //   }
+  // };
 
   const fetchUnreadCount = async () => {
     if (!user) return;
 
     try {
       const response = await api.get("/api/notifications/unread-count");
-      setUnreadCount(response.data.unreadCount);
+      // Ce endpoint exclut déjà les messages (vérifié dans corrections précédentes)
+      setUnreadCount(response.data.unreadCount || 0);
     } catch (error) {
       console.error("Erreur comptage notifications:", error);
     }

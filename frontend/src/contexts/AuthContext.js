@@ -49,7 +49,13 @@ export const AuthProvider = ({ children }) => {
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       setUser(user);
 
-      return { success: true };
+      let isAdmin = false;
+
+      if (user.role === "admin") {
+        isAdmin = true;
+      }
+
+      return { success: true, role: user.role, isAdmin };
     } catch (error) {
       return {
         success: false,

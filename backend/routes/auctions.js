@@ -394,6 +394,8 @@ router.post("/", auth, async (req, res) => {
       ],
     });
 
+    await product.update({ status: "active" });
+
     res.status(201).json({
       message: "Enchère créée avec succès",
       auction: createdAuction,

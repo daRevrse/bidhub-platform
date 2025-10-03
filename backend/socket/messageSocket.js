@@ -84,21 +84,73 @@ class MessageSocketManager {
       //   }
       // });
 
+      // socket.on("authenticate", async (data) => {
+      //   try {
+      //     let token = data;
+      //     if (typeof data === "object" && data.token) {
+      //       token = data.token;
+      //     }
+
+      //     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      //     socket.userId = decoded.userId;
+      //     this.userSockets.set(socket.userId, socket.id);
+
+      //     socket.emit("authenticated", { success: true });
+
+      //     console.log(`✅ User ${socket.userId} authenticated for messages`);
+      //   } catch (error) {
+      //     socket.emit("auth_error", "Token invalide");
+      //   }
+      // });
+
       socket.on("authenticate", async (data) => {
         try {
-          let token = data;
-          if (typeof data === "object" && data.token) {
-            token = data.token;
+          let token;
+          let userId;
+
+          // GÉRER LES DEUX FORMATS
+          if (typeof data === "string") {
+            // Format JWT: socket.emit("authenticate", "jwt_token")
+            token = data;
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            userId = decoded.userId;
+          } else if (data && typeof data === "object") {
+            if (data.token) {
+              // Format: { token: "jwt" }
+              token = data.token;
+              const decoded = jwt.verify(token, process.env.JWT_SECRET);
+              userId = decoded.userId;
+            } else if (data.userId) {
+              // Format: { userId: 123 }
+              userId = data.userId;
+            }
           }
 
-          const decoded = jwt.verify(token, process.env.JWT_SECRET);
-          socket.userId = decoded.userId;
-          this.userSockets.set(socket.userId, socket.id);
+          if (!userId) {
+            socket.emit("auth_error", "Données d'authentification invalides");
+            return;
+          }
 
-          socket.emit("authenticated", { success: true });
+          // AUTHENTIFICATION UNIFIÉE
+          socket.userId = userId;
+          this.userSockets.set(userId, socket.id);
+          this.onlineUsers.add(userId);
 
-          console.log(`✅ User ${socket.userId} authenticated for messages`);
+          socket.emit("authenticated", {
+            success: true,
+            userId,
+            socketId: socket.id,
+          });
+
+          // NOTIFIER QUE L'UTILISATEUR EST EN LIGNE
+          socket.broadcast.emit("user_online", {
+            userId,
+            timestamp: new Date(),
+          });
+
+          console.log(`✅ User ${userId} authenticated for messaging`);
         } catch (error) {
+          console.error("Erreur authentification:", error);
           socket.emit("auth_error", "Token invalide");
         }
       });
@@ -316,14 +368,91 @@ class MessageSocketManager {
   // Méthodes publiques pour envoyer des événements
 
   // Notifier d'un nouveau message
+  // notifyNewMessage(conversationId, message) {
+  //   this.io.to(`conversation_${conversationId}`).emit("new_message", {
+  //     ...message,
+  //     timestamp: new Date(),
+  //   });
+  //   console.log(
+  //     `💬 Nouveau message diffusé dans conversation ${conversationId}`
+  //   );
+  // }
+
   notifyNewMessage(conversationId, message) {
+    console.log(
+      `💬 Notification nouveau message dans conversation ${conversationId}`
+    );
+
+    // IMPORTANT: Émettre à TOUTE LA ROOM (tous les participants)
+    // Les clients filtreront eux-mêmes si nécessaire
     this.io.to(`conversation_${conversationId}`).emit("new_message", {
-      ...message,
+      ...(message.toJSON ? message.toJSON() : message),
       timestamp: new Date(),
     });
+
+    // ÉGALEMENT: Notifier les participants hors ligne via notification système
+    // Récupérer les participants de la conversation
+    this.notifyOfflineParticipants(conversationId, message);
+  }
+
+  // Notifier que des messages ont été lus
+  notifyMessagesRead(conversationId, readById) {
+    this.io.to(`conversation_${conversationId}`).emit("messages_read", {
+      conversationId,
+      readById,
+      timestamp: new Date(),
+    });
+
+    // AUSSI: broadcast à tous les sockets de l'utilisateur
+    const socketId = this.userSockets.get(readById);
+    if (socketId) {
+      this.io.emit("messages_read", {
+        conversationId,
+        readById,
+        timestamp: new Date(),
+      });
+    }
+
     console.log(
-      `💬 Nouveau message diffusé dans conversation ${conversationId}`
+      `💬 Messages read notifiés pour conversation ${conversationId}`
     );
+  }
+
+  async notifyOfflineParticipants(conversationId, message) {
+    try {
+      const { Conversation } = require("../models");
+      const conversation = await Conversation.findByPk(conversationId);
+
+      if (!conversation) return;
+
+      const participants = [
+        conversation.participant1Id,
+        conversation.participant2Id,
+      ];
+
+      // Trouver qui est hors ligne
+      // participants.forEach((participantId) => {
+      //   // Si pas l'expéditeur ET pas en ligne
+      //   if (
+      //     participantId !== message.senderId &&
+      //     !this.isUserOnline(participantId)
+      //   ) {
+      //     // Créer une notification système
+      //     const notificationService = require("../services/notificationService");
+      //     notificationService.createNotification({
+      //       userId: participantId,
+      //       type: "new_message",
+      //       title: "Nouveau message",
+      //       message: message.content?.substring(0, 100) || "[Fichier]",
+      //       data: { conversationId, messageId: message.id },
+      //       priority: "medium",
+      //       actionUrl: `/messages?conversation=${conversationId}`,
+      //     });
+      //   }
+      // });
+    } catch (error) {
+      console.error("Erreur notification participants hors ligne:", error);
+    }
   }
 
   // Notifier qu'un message a été modifié

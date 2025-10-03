@@ -139,6 +139,16 @@ Message.belongsTo(Conversation, {
   as: "conversation",
 });
 
+Message.hasMany(Message, {
+  foreignKey: "replyToId",
+  as: "replies",
+  onDelete: "SET NULL",
+});
+Message.belongsTo(Message, {
+  foreignKey: "replyToId",
+  as: "replyTo",
+});
+
 // ======= RELATIONS FAVORITES (CORRIGÉES) =======
 User.hasMany(UserFavorite, { foreignKey: "userId", as: "userFavorites" });
 UserFavorite.belongsTo(User, { foreignKey: "userId", as: "user" });

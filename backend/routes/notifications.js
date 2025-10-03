@@ -9,6 +9,63 @@ const { Op } = require("sequelize");
 // @route   GET /api/notifications
 // @desc    Obtenir les notifications de l'utilisateur
 // @access  Private
+// router.get("/", auth, async (req, res) => {
+//   try {
+//     const { page = 1, limit = 10, unreadOnly = false, type } = req.query;
+//     const offset = (parseInt(page) - 1) * parseInt(limit);
+
+//     // Construire les conditions de recherche
+//     const whereConditions = {
+//       userId: req.user.userId,
+//     };
+
+//     if (unreadOnly === "true") {
+//       whereConditions.isRead = false;
+//     }
+
+//     if (type) {
+//       whereConditions.type = type;
+//     }
+
+//     // Supprimer les notifications expirées avant la requête
+//     await Notification.destroy({
+//       where: {
+//         userId: req.user.userId,
+//         expiresAt: {
+//           [Op.lt]: new Date(),
+//         },
+//       },
+//     });
+
+//     // Récupérer les notifications
+//     const notifications = await Notification.findAndCountAll({
+//       where: whereConditions,
+//       order: [["createdAt", "DESC"]],
+//       limit: parseInt(limit),
+//       offset: offset,
+//     });
+
+//     // Compter les notifications non lues
+//     const unreadCount = await Notification.count({
+//       where: {
+//         userId: req.user.userId,
+//         isRead: false,
+//       },
+//     });
+
+//     res.json({
+//       notifications: notifications.rows,
+//       totalCount: notifications.count,
+//       unreadCount,
+//       currentPage: parseInt(page),
+//       totalPages: Math.ceil(notifications.count / parseInt(limit)),
+//       hasMore: parseInt(page) * parseInt(limit) < notifications.count,
+//     });
+//   } catch (error) {
+//     console.error("Erreur récupération notifications:", error);
+//     res.status(500).json({ message: "Erreur serveur" });
+//   }
+// });
 router.get("/", auth, async (req, res) => {
   try {
     const { page = 1, limit = 10, unreadOnly = false, type } = req.query;
@@ -17,17 +74,20 @@ router.get("/", auth, async (req, res) => {
     // Construire les conditions de recherche
     const whereConditions = {
       userId: req.user.userId,
+      type: {
+        [Op.ne]: "new_message", // ← TOUJOURS EXCLURE LES MESSAGES
+      },
     };
 
     if (unreadOnly === "true") {
       whereConditions.isRead = false;
     }
 
-    if (type) {
+    if (type && type !== "new_message") {
       whereConditions.type = type;
     }
 
-    // Supprimer les notifications expirées avant la requête
+    // Supprimer les notifications expirées
     await Notification.destroy({
       where: {
         userId: req.user.userId,
@@ -45,11 +105,14 @@ router.get("/", auth, async (req, res) => {
       offset: offset,
     });
 
-    // Compter les notifications non lues
+    // Compter les non lues (sans messages)
     const unreadCount = await Notification.count({
       where: {
         userId: req.user.userId,
         isRead: false,
+        type: {
+          [Op.ne]: "new_message", // ← EXCLURE
+        },
       },
     });
 
@@ -70,11 +133,30 @@ router.get("/", auth, async (req, res) => {
 // @route   GET /api/notifications/unread-count
 // @desc    Obtenir le nombre de notifications non lues
 // @access  Private
+// router.get("/unread-count", auth, async (req, res) => {
+//   try {
+//     const unreadCount = await NotificationService.getUnreadCount(
+//       req.user.userId
+//     );
+//     res.json({ unreadCount });
+//   } catch (error) {
+//     console.error("Erreur comptage notifications non lues:", error);
+//     res.status(500).json({ message: "Erreur serveur" });
+//   }
+// });
 router.get("/unread-count", auth, async (req, res) => {
   try {
-    const unreadCount = await NotificationService.getUnreadCount(
-      req.user.userId
-    );
+    // EXCLURE les notifications de type "new_message"
+    const unreadCount = await Notification.count({
+      where: {
+        userId: req.user.userId,
+        isRead: false,
+        type: {
+          [Op.ne]: "new_message", // ← AJOUT CRUCIAL
+        },
+      },
+    });
+
     res.json({ unreadCount });
   } catch (error) {
     console.error("Erreur comptage notifications non lues:", error);
@@ -391,11 +473,9 @@ router.post("/test", auth, async (req, res) => {
   try {
     // Seulement en développement
     if (process.env.NODE_ENV === "production") {
-      return res
-        .status(403)
-        .json({
-          message: "Fonctionnalité disponible uniquement en développement",
-        });
+      return res.status(403).json({
+        message: "Fonctionnalité disponible uniquement en développement",
+      });
     }
 
     const { type = "system", title, message, priority = "medium" } = req.body;

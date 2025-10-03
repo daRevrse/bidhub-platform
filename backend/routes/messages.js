@@ -113,11 +113,44 @@ router.get("/conversations", auth, async (req, res) => {
 // @route   POST /api/messages/conversations
 // @desc    Créer ou obtenir une conversation
 // @access  Private
+// router.post("/conversations", auth, async (req, res) => {
+//   try {
+//     const userId = req.user.userId;
+//     const { participantId, auctionId } = req.body;
+
+//     if (!participantId) {
+//       return res.status(400).json({ message: "ID du participant requis" });
+//     }
+
+//     if (participantId === userId) {
+//       return res.status(400).json({
+//         message: "Impossible de créer une conversation avec soi-même",
+//       });
+//     }
+
+//     const conversation = await messagingService.getOrCreateConversation(
+//       userId,
+//       participantId,
+//       auctionId
+//     );
+
+//     res.status(201).json({
+//       message: "Conversation créée/récupérée",
+//       conversation,
+//     });
+//   } catch (error) {
+//     console.error("Erreur création conversation:", error);
+//     res.status(400).json({ message: error.message });
+//   }
+// });
 router.post("/conversations", auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { participantId, auctionId } = req.body;
 
+    console.log(`💬 Création conversation: ${userId} → ${participantId}`);
+
+    // VALIDATIONS
     if (!participantId) {
       return res.status(400).json({ message: "ID du participant requis" });
     }
@@ -128,19 +161,31 @@ router.post("/conversations", auth, async (req, res) => {
       });
     }
 
+    // Vérifier que le participant existe
+    const participant = await User.findByPk(participantId);
+    if (!participant) {
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
+    }
+
+    // Créer ou récupérer la conversation
     const conversation = await messagingService.getOrCreateConversation(
       userId,
       participantId,
       auctionId
     );
 
+    console.log("✅ Conversation créée/récupérée:", conversation.id);
+
     res.status(201).json({
       message: "Conversation créée/récupérée",
       conversation,
     });
   } catch (error) {
-    console.error("Erreur création conversation:", error);
-    res.status(400).json({ message: error.message });
+    console.error("❌ Erreur création conversation:", error);
+    res.status(500).json({
+      message: "Erreur lors de la création de la conversation",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 });
 
@@ -167,25 +212,6 @@ router.get("/conversations/:id", auth, async (req, res) => {
 // @route   GET /api/messages/conversations/:id/messages
 // @desc    Obtenir les messages d'une conversation
 // @access  Private
-// router.get("/conversations/:id/messages", auth, async (req, res) => {
-//   try {
-//     const userId = req.user.userId;
-//     const conversationId = req.params.id;
-//     const { page = 1, limit = 50 } = req.query;
-
-//     const result = await messagingService.getMessages(
-//       conversationId,
-//       userId,
-//       parseInt(page),
-//       parseInt(limit)
-//     );
-
-//     res.json(result);
-//   } catch (error) {
-//     console.error("Erreur récupération messages:", error);
-//     res.status(400).json({ message: error.message });
-//   }
-// });
 
 router.get("/conversations/:id/messages", auth, async (req, res) => {
   try {
@@ -243,8 +269,17 @@ router.get("/conversations/:id/messages", auth, async (req, res) => {
 //   async (req, res) => {
 //     try {
 //       const userId = req.user.userId;
-//       const conversationId = req.params.id;
+//       const conversationId = parseInt(req.params.id);
 //       const { content, messageType = "text", metadata, replyToId } = req.body;
+
+//       // VALIDATIONS
+//       if (!conversationId || isNaN(conversationId)) {
+//         return res.status(400).json({ message: "ID de conversation invalide" });
+//       }
+
+//       if (!content && !req.file) {
+//         return res.status(400).json({ message: "Contenu ou fichier requis" });
+//       }
 
 //       let finalContent = content;
 //       let finalMessageType = messageType;
@@ -276,62 +311,13 @@ router.get("/conversations/:id/messages", auth, async (req, res) => {
 //         replyToId
 //       );
 
-//       // ÉMETTRE VIA SOCKET.IO POUR LE TEMPS RÉEL
-//       // if (req.io) {
-//       //   req.io
-//       //     .to(`conversation_${conversationId}`)
-//       //     .emit("new_message", message);
-//       //   console.log(
-//       //     `💬 Message diffusé via Socket.io dans conversation ${conversationId}`
-//       //   );
-//       // }
-
-//       if (req.app.get("messageSocketManager")) {
-//         req.app
-//           .get("messageSocketManager")
-//           .notifyNewMessage(conversationId, message);
+//       // ÉMISSION SOCKET CORRIGÉE (sans namespace)
+//       if (req.io) {
+//         req.io
+//           .to(`conversation_${conversationId}`)
+//           .emit("new_message", message);
+//         console.log(`💬 Message diffusé dans conversation ${conversationId}`);
 //       }
-
-//       // if (req.io) {
-//       //   // Utiliser le namespace messages
-//       //   const messagesNamespace = req.io.of("/messages");
-//       //   messagesNamespace
-//       //     .to(`conversation_${conversationId}`)
-//       //     .emit("new_message", message);
-//       //   console.log(
-//       //     `💬 Message diffusé via namespace /messages dans conversation ${conversationId}`
-//       //   );
-//       // }
-
-//       // Obtenir les détails de la conversation pour les notifications
-//       const conversation = await messagingService.getConversation(
-//         conversationId,
-//         userId
-//       );
-
-//       // Envoyer notification à l'autre participant
-//       const otherParticipantId =
-//         conversation.participant1Id === userId
-//           ? conversation.participant2Id
-//           : conversation.participant1Id;
-
-//       // if (otherParticipantId) {
-//       //   const senderName = `${req.user.firstName} ${req.user.lastName}`;
-//       //   const preview =
-//       //     finalMessageType === "text"
-//       //       ? finalContent.length > 50
-//       //         ? finalContent.substring(0, 50) + "..."
-//       //         : finalContent
-//       //       : `[${finalMessageType === "image" ? "Image" : "Fichier"}]`;
-
-//       //   // await NotificationService.notifyNewMessage(
-//       //   //   otherParticipantId,
-//       //   //   userId,
-//       //   //   senderName,
-//       //   //   preview,
-//       //   //   conversationId
-//       //   // );
-//       // }
 
 //       res.status(201).json({
 //         message: "Message envoyé",
@@ -339,7 +325,7 @@ router.get("/conversations/:id/messages", auth, async (req, res) => {
 //       });
 //     } catch (error) {
 //       console.error("Erreur envoi message:", error);
-//       res.status(400).json({ message: error.message });
+//       res.status(500).json({ message: error.message });
 //     }
 //   }
 // );
@@ -354,20 +340,16 @@ router.post(
       const conversationId = parseInt(req.params.id);
       const { content, messageType = "text", metadata, replyToId } = req.body;
 
-      // VALIDATIONS
+      // VALIDATION
       if (!conversationId || isNaN(conversationId)) {
-        return res.status(400).json({ message: "ID de conversation invalide" });
-      }
-
-      if (!content && !req.file) {
-        return res.status(400).json({ message: "Contenu ou fichier requis" });
+        return res.status(400).json({ message: "ID conversation invalide" });
       }
 
       let finalContent = content;
       let finalMessageType = messageType;
       let attachments = [];
 
-      // Traitement du fichier uploadé
+      // Traitement du fichier
       if (req.file) {
         attachments.push({
           filename: req.file.filename,
@@ -376,13 +358,13 @@ router.post(
           size: req.file.size,
           path: req.file.path,
         });
-
         finalMessageType = req.file.mimetype.startsWith("image/")
           ? "image"
           : "file";
         finalContent = finalContent || req.file.originalname;
       }
 
+      // ENVOYER LE MESSAGE
       const message = await messagingService.sendMessage(
         conversationId,
         userId,
@@ -393,21 +375,119 @@ router.post(
         replyToId
       );
 
-      // ÉMISSION SOCKET CORRIGÉE (sans namespace)
-      if (req.io) {
-        req.io
-          .to(`conversation_${conversationId}`)
-          .emit("new_message", message);
-        console.log(`💬 Message diffusé dans conversation ${conversationId}`);
+      // ÉMETTRE VIA SOCKET.IO
+      const messageSocketManager = req.app.get("messageSocketManager");
+      // if (messageSocketManager) {
+      //   messageSocketManager.notifyNewMessage(conversationId, message);
+      //   console.log(
+      //     `💬 Message émis via socket pour conversation ${conversationId}`
+      //   );
+      // }
+
+      // // OBTENIR LES DÉTAILS DE LA CONVERSATION
+      // const conversation = await messagingService.getConversation(
+      //   conversationId,
+      //   userId
+      // );
+
+      // // ENVOYER NOTIFICATION À L'AUTRE PARTICIPANT
+      // const otherParticipantId =
+      //   conversation.participant1Id === userId
+      //     ? conversation.participant2Id
+      //     : conversation.participant1Id;
+
+      // if (otherParticipantId) {
+      //   const NotificationService = require("../services/notificationService");
+      //   const senderName = `${req.user.firstName} ${req.user.lastName}`;
+      //   const preview =
+      //     finalMessageType === "text"
+      //       ? finalContent.length > 50
+      //         ? finalContent.substring(0, 50) + "..."
+      //         : finalContent
+      //       : `[${finalMessageType === "image" ? "Image" : "Fichier"}]`;
+
+      //   await NotificationService.createNotification({
+      //     userId: otherParticipantId,
+      //     type: "new_message",
+      //     title: `${senderName} vous a envoyé un message`,
+      //     message: preview,
+      //     data: { conversationId, messageId: message.id },
+      //     priority: "medium",
+      //     actionUrl: `/messages?conversation=${conversationId}`,
+      //   });
+      // }
+
+      const conversation = await messagingService.getConversation(
+        conversationId,
+        userId
+      );
+
+      if (messageSocketManager) {
+        // Émettre le nouveau message
+        messageSocketManager.notifyNewMessage(conversationId, message);
+
+        // ✅ NOUVEAU: Émettre le count mis à jour pour l'autre participant
+        // const conversation = await messagingService.getConversation(
+        //   conversationId,
+        //   userId
+        // );
+
+        const otherParticipantId =
+          conversation.participant1Id === userId
+            ? conversation.participant2Id
+            : conversation.participant1Id;
+
+        // Calculer et envoyer le nouveau count
+        const newUnreadCount = await messagingService.getUnreadCount(
+          otherParticipantId
+        );
+
+        messageSocketManager.sendToUser(
+          otherParticipantId,
+          "message_unread_count",
+          { count: newUnreadCount }
+        );
+
+        console.log(
+          `💬 Count mis à jour pour user ${otherParticipantId}: ${newUnreadCount}`
+        );
       }
+
+      // const NotificationService = require("../services/notificationService");
+      // const senderName = `${req.user.firstName} ${req.user.lastName}`;
+      // const preview =
+      //   finalMessageType === "text"
+      //     ? finalContent.length > 50
+      //       ? finalContent.substring(0, 50) + "..."
+      //       : finalContent
+      //     : `[${finalMessageType === "image" ? "Image" : "Fichier"}]`;
+
+      // const otherParticipantId =
+      //   conversation.participant1Id === userId
+      //     ? conversation.participant2Id
+      //     : conversation.participant1Id;
+
+      // await NotificationService.createNotification({
+      //   userId: otherParticipantId,
+      //   type: "new_message",
+      //   title: `${senderName} vous a envoyé un message`,
+      //   message: preview,
+      //   data: { conversationId, messageId: message.id },
+      //   priority: "medium",
+      //   actionUrl: `/messages?conversation=${conversationId}`,
+      // });
 
       res.status(201).json({
         message: "Message envoyé",
         data: message,
       });
     } catch (error) {
-      console.error("Erreur envoi message:", error);
-      res.status(500).json({ message: error.message });
+      console.error("❌ Erreur envoi message:", error);
+      res.status(500).json({
+        message: "Erreur lors de l'envoi du message",
+        error:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
     }
   }
 );
@@ -415,14 +495,19 @@ router.post(
 // @route   PUT /api/messages/conversations/:id/read
 // @desc    Marquer les messages comme lus
 // @access  Private
+
 // router.put("/conversations/:id/read", auth, async (req, res) => {
 //   try {
 //     const userId = req.user.userId;
-//     const conversationId = req.params.id;
+//     const conversationId = parseInt(req.params.id);
+
+//     if (!conversationId || isNaN(conversationId)) {
+//       return res.status(400).json({ message: "ID de conversation invalide" });
+//     }
 
 //     await messagingService.markAsRead(conversationId, userId);
 
-//     // NOTIFIER L'AUTRE PARTICIPANT VIA SOCKET.IO
+//     // CORRIGER L'ÉMISSION SOCKET (supprimer namespace)
 //     if (req.io) {
 //       req.io.to(`conversation_${conversationId}`).emit("messages_read", {
 //         conversationId,
@@ -434,48 +519,30 @@ router.post(
 //       );
 //     }
 
-//     // if (req.io) {
-//     //   // Utiliser le namespace messages
-//     //   const messagesNamespace = req.io.of("/messages");
-//     //   messagesNamespace
-//     //     .to(`conversation_${conversationId}`)
-//     //     .emit("messages_read", {
-//     //       conversationId,
-//     //       readById: userId,
-//     //       timestamp: new Date(),
-//     //     });
-//     //   console.log(
-//     //     `💬 Messages read notification diffusée via namespace /messages pour conversation ${conversationId}`
-//     //   );
-//     // }
-
 //     res.json({ message: "Messages marqués comme lus" });
 //   } catch (error) {
 //     console.error("Erreur marquage lecture:", error);
-//     res.status(400).json({ message: error.message });
+//     res.status(500).json({ message: error.message });
 //   }
 // });
-
 router.put("/conversations/:id/read", auth, async (req, res) => {
   try {
     const userId = req.user.userId;
     const conversationId = parseInt(req.params.id);
 
     if (!conversationId || isNaN(conversationId)) {
-      return res.status(400).json({ message: "ID de conversation invalide" });
+      return res.status(400).json({ message: "ID conversation invalide" });
     }
 
     await messagingService.markAsRead(conversationId, userId);
 
-    // CORRIGER L'ÉMISSION SOCKET (supprimer namespace)
-    if (req.io) {
-      req.io.to(`conversation_${conversationId}`).emit("messages_read", {
-        conversationId,
-        readById: userId,
-        timestamp: new Date(),
-      });
+    // ÉMETTRE VIA SOCKET.IO À TOUS LES PARTICIPANTS
+    const messageSocketManager = req.app.get("messageSocketManager");
+    if (messageSocketManager) {
+      // Émettre dans la room de la conversation
+      messageSocketManager.notifyMessagesRead(conversationId, userId);
       console.log(
-        `💬 Messages read notification diffusée pour conversation ${conversationId}`
+        `💬 Émission messages_read pour conversation ${conversationId}`
       );
     }
 

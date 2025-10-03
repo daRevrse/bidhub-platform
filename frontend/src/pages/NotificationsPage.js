@@ -12,9 +12,11 @@ import {
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
 import { BellIcon as BellSolidIcon } from "@heroicons/react/24/solid";
+import { useAuth } from "../contexts/AuthContext";
 
 const NotificationsPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const {
     notifications,
     unreadCount,
@@ -29,6 +31,7 @@ const NotificationsPage = () => {
     groupNotificationsByDate,
     filterNotifications,
     clearError,
+    fetchNotifications,
   } = useNotifications();
 
   // États locaux
@@ -44,6 +47,13 @@ const NotificationsPage = () => {
     // Nettoyer l'erreur au montage
     clearError();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      // Charger les notifications (déjà filtrées backend)
+      fetchNotifications();
+    }
+  }, [user]);
 
   // Filtrage des notifications
   const filteredNotifications = filterNotifications({

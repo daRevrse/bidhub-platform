@@ -160,61 +160,228 @@ const MessagesPage = () => {
   }, [fetchConversationsOptimized]);
 
   // SETUP SOCKET LISTENERS OPTIMISÉ
+  // const setupSocketListeners = useCallback(() => {
+  //   if (!socket || !user) {
+  //     console.log("💬 Socket ou user non disponible pour les listeners");
+  //     return;
+  //   }
+
+  //   if (typeof socket.on !== "function" || typeof socket.off !== "function") {
+  //     console.error("💬 Socket n'a pas les méthodes on/off");
+  //     return;
+  //   }
+
+  //   console.log("💬 Configuration des listeners Socket pour les messages");
+
+  //   // Authentifier le socket pour les messages
+  //   const token = localStorage.getItem("token");
+  //   if (token) {
+  //     socket.emit("authenticate", token);
+  //   }
+
+  //   const handleNewMessage = (message) => {
+  //     console.log("💬 Nouveau message reçu en temps réel:", message);
+
+  //     // Ajouter uniquement si c'est pour la conversation active
+  //     if (
+  //       activeConversation &&
+  //       message.conversationId === activeConversation.id
+  //     ) {
+  //       setMessages((prev) => [...prev, message]);
+  //     }
+
+  //     // Mettre à jour les conversations LOCALEMENT
+  //     setConversations((prev) =>
+  //       prev.map((conv) =>
+  //         conv.id === message.conversationId
+  //           ? {
+  //               ...conv,
+  //               lastMessageAt: new Date().toISOString(),
+  //               lastMessagePreview:
+  //                 message.content?.substring(0, 100) || "[Fichier]",
+  //               unreadCount:
+  //                 conv.id === activeConversation?.id
+  //                   ? 0
+  //                   : (conv.unreadCount || 0) + 1,
+  //             }
+  //           : conv
+  //       )
+  //     );
+  //   };
+
+  //   const handleMessagesRead = (data) => {
+  //     console.log("💬 Messages marqués comme lus:", data);
+  //     if (activeConversation && data.conversationId === activeConversation.id) {
+  //       setMessages((prev) => prev.map((msg) => ({ ...msg, isRead: true })));
+  //     }
+  //     // Mettre à jour les conversations LOCALEMENT
+  //     setConversations((prev) =>
+  //       prev.map((conv) =>
+  //         conv.id === data.conversationId ? { ...conv, unreadCount: 0 } : conv
+  //       )
+  //     );
+  //   };
+
+  //   const handleUserTyping = (data) => {
+  //     if (activeConversation && data.conversationId === activeConversation.id) {
+  //       if (data.isTyping) {
+  //         setTypingUsers((prev) => new Set([...prev, data.userId]));
+  //       } else {
+  //         setTypingUsers((prev) => {
+  //           const newSet = new Set(prev);
+  //           newSet.delete(data.userId);
+  //           return newSet;
+  //         });
+  //       }
+
+  //       // Supprimer automatiquement après 3 secondes
+  //       setTimeout(() => {
+  //         setTypingUsers((prev) => {
+  //           const newSet = new Set(prev);
+  //           newSet.delete(data.userId);
+  //           return newSet;
+  //         });
+  //       }, 3000);
+  //     }
+  //   };
+
+  //   const handleUserOnline = (data) => {
+  //     setOnlineUsers((prev) => new Set([...prev, data.userId]));
+  //   };
+
+  //   const handleUserOffline = (data) => {
+  //     setOnlineUsers((prev) => {
+  //       const newSet = new Set(prev);
+  //       newSet.delete(data.userId);
+  //       return newSet;
+  //     });
+  //   };
+
+  //   // Attacher les listeners
+  //   socket.on("new_message", handleNewMessage);
+  //   socket.on("messages_read", handleMessagesRead);
+  //   socket.on("user_typing", handleUserTyping);
+  //   socket.on("user_online", handleUserOnline);
+  //   socket.on("user_offline", handleUserOffline);
+
+  //   return () => {
+  //     console.log("💬 Nettoyage des listeners Socket");
+  //     if (socket && typeof socket.off === "function") {
+  //       socket.off("new_message", handleNewMessage);
+  //       socket.off("messages_read", handleMessagesRead);
+  //       socket.off("user_typing", handleUserTyping);
+  //       socket.off("user_online", handleUserOnline);
+  //       socket.off("user_offline", handleUserOffline);
+  //     }
+  //   };
+  // }, [user, activeConversation?.id]);
+
   const setupSocketListeners = useCallback(() => {
     if (!socket || !user) {
-      console.log("💬 Socket ou user non disponible pour les listeners");
+      console.log("💬 Socket ou user non disponible");
       return;
     }
 
     if (typeof socket.on !== "function" || typeof socket.off !== "function") {
-      console.error("💬 Socket n'a pas les méthodes on/off");
+      console.error("💬 Socket invalide");
       return;
     }
 
-    console.log("💬 Configuration des listeners Socket pour les messages");
+    console.log("💬 Configuration des listeners Socket");
 
-    // Authentifier le socket pour les messages
+    // Authentifier une seule fois
     const token = localStorage.getItem("token");
-    if (token) {
+    if (token && !socket.userId) {
       socket.emit("authenticate", token);
+      console.log("💬 Authentification socket envoyée");
     }
 
     const handleNewMessage = (message) => {
-      console.log("💬 Nouveau message reçu en temps réel:", message);
+      console.log("💬 📨 Nouveau message reçu:", message);
 
-      // Ajouter uniquement si c'est pour la conversation active
+      let messageWithUrls = { ...message };
+
+      if (message.attachments) {
+        try {
+          const attachments =
+            typeof message.attachments === "string"
+              ? JSON.parse(message.attachments)
+              : message.attachments;
+
+          // Ajouter les URLs complètes si elles n'existent pas
+          const attachmentsWithUrls = Array.isArray(attachments)
+            ? attachments.map((att) => ({
+                ...att,
+                url:
+                  att.url ||
+                  `${process.env.REACT_APP_API_URL}/uploads/messages/${att.filename}`,
+              }))
+            : [];
+
+          messageWithUrls.attachments = attachmentsWithUrls;
+        } catch (error) {
+          console.error("Erreur parsing attachments:", error);
+          messageWithUrls.attachments = [];
+        }
+      }
+
+      // TOUJOURS ajouter à la liste si c'est la conversation active
       if (
         activeConversation &&
         message.conversationId === activeConversation.id
       ) {
-        setMessages((prev) => [...prev, message]);
+        setMessages((prev) => {
+          // ÉVITER LES DOUBLONS
+          const exists = prev.some((m) => m.id === message.id);
+          if (exists) return prev;
+          return [...prev, message];
+        });
+
+        // AUTO-SCROLL
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
       }
 
-      // Mettre à jour les conversations LOCALEMENT
+      // METTRE À JOUR LA LISTE DES CONVERSATIONS
       setConversations((prev) =>
-        prev.map((conv) =>
-          conv.id === message.conversationId
-            ? {
-                ...conv,
-                lastMessageAt: new Date().toISOString(),
-                lastMessagePreview:
-                  message.content?.substring(0, 100) || "[Fichier]",
-                unreadCount:
-                  conv.id === activeConversation?.id
-                    ? 0
-                    : (conv.unreadCount || 0) + 1,
-              }
-            : conv
-        )
+        prev.map((conv) => {
+          if (conv.id === message.conversationId) {
+            return {
+              ...conv,
+              lastMessageAt: new Date().toISOString(),
+              lastMessage: {
+                content: message.content,
+                senderId: message.senderId,
+                createdAt: message.createdAt,
+              },
+              // INCRÉMENTER unreadCount SEULEMENT si pas la conversation active
+              unreadCount:
+                activeConversation?.id === conv.id
+                  ? 0
+                  : (conv.unreadCount || 0) + 1,
+            };
+          }
+          return conv;
+        })
       );
     };
 
     const handleMessagesRead = (data) => {
-      console.log("💬 Messages marqués comme lus:", data);
+      console.log("💬 ✅ Messages marqués comme lus:", data);
+
       if (activeConversation && data.conversationId === activeConversation.id) {
-        setMessages((prev) => prev.map((msg) => ({ ...msg, isRead: true })));
+        // Marquer tous les messages comme lus
+        setMessages((prev) =>
+          prev.map((msg) => ({
+            ...msg,
+            isRead: true,
+            readAt: data.timestamp || new Date(),
+          }))
+        );
       }
-      // Mettre à jour les conversations LOCALEMENT
+
+      // Mettre à jour le compteur non lu dans la liste
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === data.conversationId ? { ...conv, unreadCount: 0 } : conv
@@ -224,7 +391,7 @@ const MessagesPage = () => {
 
     const handleUserTyping = (data) => {
       if (activeConversation && data.conversationId === activeConversation.id) {
-        if (data.isTyping) {
+        if (data.isTyping && data.userId !== user.id) {
           setTypingUsers((prev) => new Set([...prev, data.userId]));
         } else {
           setTypingUsers((prev) => {
@@ -233,15 +400,6 @@ const MessagesPage = () => {
             return newSet;
           });
         }
-
-        // Supprimer automatiquement après 3 secondes
-        setTimeout(() => {
-          setTypingUsers((prev) => {
-            const newSet = new Set(prev);
-            newSet.delete(data.userId);
-            return newSet;
-          });
-        }, 3000);
       }
     };
 
@@ -257,24 +415,23 @@ const MessagesPage = () => {
       });
     };
 
-    // Attacher les listeners
+    // ATTACHER LES LISTENERS
     socket.on("new_message", handleNewMessage);
     socket.on("messages_read", handleMessagesRead);
     socket.on("user_typing", handleUserTyping);
     socket.on("user_online", handleUserOnline);
     socket.on("user_offline", handleUserOffline);
 
+    // CLEANUP
     return () => {
-      console.log("💬 Nettoyage des listeners Socket");
-      if (socket && typeof socket.off === "function") {
-        socket.off("new_message", handleNewMessage);
-        socket.off("messages_read", handleMessagesRead);
-        socket.off("user_typing", handleUserTyping);
-        socket.off("user_online", handleUserOnline);
-        socket.off("user_offline", handleUserOffline);
-      }
+      console.log("💬 🧹 Nettoyage des listeners");
+      socket.off("new_message", handleNewMessage);
+      socket.off("messages_read", handleMessagesRead);
+      socket.off("user_typing", handleUserTyping);
+      socket.off("user_online", handleUserOnline);
+      socket.off("user_offline", handleUserOffline);
     };
-  }, [user, activeConversation?.id]);
+  }, [socket, user, activeConversation?.id]);
 
   // GESTION DE LA SAISIE
   const handleTyping = useCallback(() => {
@@ -327,6 +484,13 @@ const MessagesPage = () => {
 
         console.log("💬 Sélection de la conversation:", conversation.id);
 
+        const currentConversationId = searchParams.get("conversation");
+        if (currentConversationId) {
+          // Retirer le paramètre conversation de l'URL
+          window.history.replaceState({}, "", "/messages");
+          hasLoadedFromUrl.current = true; // Empêcher reload depuis URL
+        }
+
         // Quitter la conversation précédente
         if (activeConversation && socket && typeof socket.emit === "function") {
           socket.emit("leave_conversation", activeConversation.id);
@@ -359,15 +523,74 @@ const MessagesPage = () => {
         console.error("❌ Erreur sélection conversation:", error);
       }
     },
-    [activeConversation, socket, fetchMessages, markAsRead]
+    [activeConversation, socket, fetchMessages, markAsRead, searchParams]
   );
 
   // ENVOI DE MESSAGE - VERSION AMÉLIORÉE (de votre code)
+  // const sendMessage = async (e) => {
+  //   e.preventDefault();
+
+  //   if ((!newMessage.trim() && !selectedFile) || !activeConversation || sending)
+  //     return;
+
+  //   setSending(true);
+
+  //   try {
+  //     const formData = new FormData();
+
+  //     if (selectedFile) {
+  //       formData.append("file", selectedFile);
+  //       formData.append(
+  //         "messageType",
+  //         selectedFile.type.startsWith("image/") ? "image" : "file"
+  //       );
+  //     }
+
+  //     if (newMessage.trim()) {
+  //       formData.append("content", newMessage.trim());
+  //       if (!selectedFile) {
+  //         formData.append("messageType", "text");
+  //       }
+  //     }
+
+  //     const response = await api.post(
+  //       `/api/messages/conversations/${activeConversation.id}/messages`,
+  //       formData,
+  //       {
+  //         headers: {
+  //           "Content-Type": "multipart/form-data",
+  //         },
+  //       }
+  //     );
+
+  //     // Réinitialiser
+  //     setNewMessage("");
+  //     setSelectedFile(null);
+
+  //     requestAnimationFrame(() => {
+  //       // messageInputRef.current?.focus({ preventScroll: true });
+  //       scrollToBottom();
+  //     });
+
+  //     // Mettre à jour les conversations
+  //     fetchConversationsOptimized();
+  //   } catch (error) {
+  //     console.error("Erreur envoi message:", error);
+  //   } finally {
+  //     setSending(false);
+  //   }
+  // };
+
   const sendMessage = async (e) => {
     e.preventDefault();
 
-    if ((!newMessage.trim() && !selectedFile) || !activeConversation || sending)
+    if (
+      (!newMessage.trim() && !selectedFile) ||
+      !activeConversation ||
+      sending
+    ) {
       return;
+    }
 
     setSending(true);
 
@@ -384,37 +607,36 @@ const MessagesPage = () => {
 
       if (newMessage.trim()) {
         formData.append("content", newMessage.trim());
-        if (!selectedFile) {
-          formData.append("messageType", "text");
-        }
       }
 
       const response = await api.post(
         `/api/messages/conversations/${activeConversation.id}/messages`,
         formData,
         {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+          headers: { "Content-Type": "multipart/form-data" },
         }
       );
 
-      // Ajouter le message à la liste locale
-      // setMessages((prev) => [...prev, response.data.data]);
+      console.log("✅ Message envoyé:", response.data);
 
-      // Réinitialiser
+      // IMPORTANT: NE PAS AJOUTER LE MESSAGE ICI
+      // Il sera ajouté automatiquement via le listener "new_message"
+      // Cela évite les doublons
+
+      // Réinitialiser le formulaire
       setNewMessage("");
       setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
 
-      requestAnimationFrame(() => {
-        // messageInputRef.current?.focus({ preventScroll: true });
-        scrollToBottom();
-      });
-
-      // Mettre à jour les conversations
-      fetchConversationsOptimized();
+      // Auto-scroll
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
     } catch (error) {
-      console.error("Erreur envoi message:", error);
+      console.error("❌ Erreur envoi message:", error);
+      alert("Erreur lors de l'envoi du message");
     } finally {
       setSending(false);
     }
@@ -441,31 +663,101 @@ const MessagesPage = () => {
     }
   }, []);
 
+  // const startNewConversation = useCallback(
+  //   async (otherUserId) => {
+  //     try {
+  //       const response = await api.post("/api/messages/conversations", {
+  //         participantId: otherUserId,
+  //       });
+
+  //       const newConversation = response.data.conversation;
+  //       await fetchConversationsOptimized();
+  //       setShowNewConversation(false);
+  //       setSearchQuery("");
+  //       setSearchResults([]);
+
+  //       setTimeout(() => {
+  //         selectConversation(newConversation);
+  //       }, 100);
+  //     } catch (error) {
+  //       console.error("Erreur création conversation:", error);
+  //     }
+  //   },
+  //   [fetchConversationsOptimized, selectConversation]
+  // );
+
+  // FONCTIONS UTILITAIRES
+
   const startNewConversation = useCallback(
     async (otherUserId) => {
       try {
+        console.log("💬 Création conversation avec utilisateur:", otherUserId);
+
+        if (!otherUserId || otherUserId === user.id) {
+          console.error("❌ ID utilisateur invalide");
+          return;
+        }
+
+        // Vérifier si une conversation existe déjà
+        const existingConv = conversations.find(
+          (conv) =>
+            (conv.participant1Id === user.id &&
+              conv.participant2Id === otherUserId) ||
+            (conv.participant2Id === user.id &&
+              conv.participant1Id === otherUserId)
+        );
+
+        if (existingConv) {
+          console.log("💬 Conversation existante trouvée:", existingConv.id);
+          setShowNewConversation(false);
+          setSearchQuery("");
+          setSearchResults([]);
+          await selectConversation(existingConv);
+          return;
+        }
+
+        // Créer nouvelle conversation
         const response = await api.post("/api/messages/conversations", {
           participantId: otherUserId,
         });
 
+        console.log("✅ Conversation créée:", response.data);
+
         const newConversation = response.data.conversation;
-        await fetchConversationsOptimized();
+
+        // Ajouter à la liste locale immédiatement
+        setConversations((prev) => [newConversation, ...prev]);
+
+        // Fermer le modal et réinitialiser
         setShowNewConversation(false);
         setSearchQuery("");
         setSearchResults([]);
 
+        // Sélectionner la nouvelle conversation
         setTimeout(() => {
           selectConversation(newConversation);
         }, 100);
       } catch (error) {
-        console.error("Erreur création conversation:", error);
+        console.error("❌ Erreur création conversation:", error);
+        alert(
+          error.response?.data?.message ||
+            "Erreur lors de la création de la conversation"
+        );
       }
     },
-    [fetchConversationsOptimized, selectConversation]
+    [api, conversations, user, selectConversation]
   );
 
-  // FONCTIONS UTILITAIRES
   const scrollToBottom = useCallback(() => {
+    // Méthode 1: Utiliser scrollIntoView avec le ref
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "end", // ← IMPORTANT: "end" au lieu de "start"
+      });
+    }
+
+    // Méthode 2 (backup): Forcer le scroll sur le container
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop =
         messagesContainerRef.current.scrollHeight;
@@ -519,17 +811,46 @@ const MessagesPage = () => {
     }
   }, [socket, user, setupSocketListeners]);
 
+  // useEffect(() => {
+  //   const conversationId = searchParams.get("conversation");
+  //   if (conversationId && conversations.length > 0) {
+  //     const conversation = conversations.find(
+  //       (c) => c.id === parseInt(conversationId)
+  //     );
+  //     if (conversation) {
+  //       selectConversation(conversation);
+  //     }
+  //   }
+  // }, [searchParams, conversations, selectConversation]);
+
+  const conversationIdFromUrl = useRef(null);
+  const hasLoadedFromUrl = useRef(false);
+
   useEffect(() => {
     const conversationId = searchParams.get("conversation");
-    if (conversationId && conversations.length > 0) {
+
+    // Sauvegarder l'ID de la conversation depuis l'URL
+    if (conversationId && conversationId !== conversationIdFromUrl.current) {
+      conversationIdFromUrl.current = conversationId;
+      hasLoadedFromUrl.current = false; // Réinitialiser le flag
+    }
+
+    if (
+      conversationId &&
+      conversations.length > 0 &&
+      !hasLoadedFromUrl.current
+    ) {
       const conversation = conversations.find(
         (c) => c.id === parseInt(conversationId)
       );
+
       if (conversation) {
+        console.log("💬 Chargement conversation depuis URL:", conversationId);
         selectConversation(conversation);
+        hasLoadedFromUrl.current = true; // Marquer comme chargé
       }
     }
-  }, [searchParams, conversations, selectConversation]);
+  }, [searchParams, conversations]);
 
   useEffect(() => {
     scrollToBottom();
@@ -934,14 +1255,18 @@ const MessagesPage = () => {
                   {/* Zone des messages */}
                   <div
                     ref={messagesContainerRef}
-                    className="flex-1 overflow-y-auto bg-gray-50/30 p-4"
+                    className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50"
+                    style={{
+                      maxHeight: "calc(100vh - 16rem)", // ← IMPORTANT
+                      scrollBehavior: "smooth",
+                    }}
                   >
                     {loadingMessages ? (
-                      <div className="flex justify-center items-center h-40">
+                      <div className="flex items-center justify-center h-full">
                         <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
                       </div>
                     ) : messages.length === 0 ? (
-                      <div className="text-center py-12">
+                      <div className="flex items-center justify-center h-full">
                         <p className="text-gray-500">
                           Aucun message dans cette conversation.
                         </p>
@@ -1013,19 +1338,52 @@ const MessagesPage = () => {
                                     {message.messageType === "image" &&
                                       message.attachments && (
                                         <div>
-                                          <img
-                                            src={`${process.env.REACT_APP_API_URL}/uploads/messages/${message.attachments[0]?.filename}`}
-                                            alt="Image partagée"
-                                            className="max-w-full h-auto rounded-lg mb-2 cursor-pointer hover:opacity-90 transition-opacity"
-                                            onClick={() =>
-                                              window.open(
-                                                `${process.env.REACT_APP_API_URL}/uploads/messages/${message.attachments[0]?.filename}`,
-                                                "_blank"
-                                              )
-                                            }
-                                          />
+                                          {(() => {
+                                            // Parser les attachments
+                                            const attachments =
+                                              typeof message.attachments ===
+                                              "string"
+                                                ? JSON.parse(
+                                                    message.attachments
+                                                  )
+                                                : Array.isArray(
+                                                    message.attachments
+                                                  )
+                                                ? message.attachments
+                                                : [];
+
+                                            const imageAttachment =
+                                              attachments[0];
+
+                                            // Construire l'URL complète
+                                            const imageUrl =
+                                              imageAttachment?.url ||
+                                              `${process.env.REACT_APP_API_URL}/uploads/messages/${imageAttachment?.filename}`;
+
+                                            return (
+                                              <img
+                                                src={imageUrl}
+                                                alt="Image-partagée"
+                                                className="max-w-full h-auto rounded-lg mb-2 cursor-pointer hover:opacity-90 transition-opacity"
+                                                onClick={() =>
+                                                  window.open(
+                                                    imageUrl,
+                                                    "_blank"
+                                                  )
+                                                }
+                                                onError={(e) => {
+                                                  console.error(
+                                                    "Erreur chargement image:",
+                                                    imageUrl
+                                                  );
+                                                  e.target.src =
+                                                    "/placeholder-image.png"; // Image de secours
+                                                }}
+                                              />
+                                            );
+                                          })()}
                                           {message.content && (
-                                            <p className="text-sm mt-2">
+                                            <p className="text-sm">
                                               {message.content}
                                             </p>
                                           )}
@@ -1093,7 +1451,7 @@ const MessagesPage = () => {
                             </div>
                           );
                         })}
-                        <div ref={messagesEndRef} />
+                        {/* <div ref={messagesEndRef} style={{ height: "1px" }} /> */}
                       </div>
                     )}
                   </div>

@@ -47,23 +47,31 @@ const MessageNotification = () => {
   }, [user]);
 
   // USEEFFECT SÉPARÉ POUR LES SOCKET LISTENERS
+
   useEffect(() => {
     if (!socket || !user) return;
 
-    console.log("💬 Setting up socket listeners for MessageNotification");
+    console.log("💬 Configuration listeners MessageNotification");
 
     const handleNewMessage = (message) => {
-      console.log("💬 Nouveau message reçu:", message);
-      fetchUnreadCount();
+      console.log("💬 📨 Nouveau message reçu:", message);
 
-      // Si le dropdown est ouvert, actualiser les messages récents
+      // MISE À JOUR INSTANTANÉE DU COMPTEUR
+      // Ne compter que si le message n'est pas de l'utilisateur actuel
+      if (message.senderId !== user.id) {
+        setUnreadCount((prev) => prev + 1);
+      }
+
+      // Recharger messages récents si dropdown ouvert
       if (isOpen) {
         loadRecentMessages();
       }
     };
 
     const handleMessagesRead = (data) => {
-      console.log("💬 Messages marqués comme lus:", data);
+      console.log("💬 ✅ Messages marqués comme lus:", data);
+
+      // MISE À JOUR INSTANTANÉE - Fetch le count réel
       fetchUnreadCount();
 
       if (isOpen) {
@@ -71,20 +79,22 @@ const MessageNotification = () => {
       }
     };
 
-    // VÉRIFIER QUE socket.on EXISTE AVANT DE L'UTILISER
-    if (typeof socket.on === "function") {
-      socket.on("new_message", handleNewMessage);
-      socket.on("messages_read", handleMessagesRead);
-    } else {
-      console.warn("💬 Socket.on n'est pas disponible:", socket);
-    }
+    // NOUVEAU: Listener pour mise à jour count directe
+    const handleUnreadCountUpdate = (data) => {
+      console.log("💬 📊 Unread count mis à jour:", data);
+      setUnreadCount(data.count || 0);
+    };
+
+    // ATTACHER
+    socket.on("new_message", handleNewMessage);
+    socket.on("messages_read", handleMessagesRead);
+    socket.on("message_unread_count", handleUnreadCountUpdate); // ← NOUVEAU
 
     // CLEANUP
     return () => {
-      if (socket && typeof socket.off === "function") {
-        socket.off("new_message", handleNewMessage);
-        socket.off("messages_read", handleMessagesRead);
-      }
+      socket.off("new_message", handleNewMessage);
+      socket.off("messages_read", handleMessagesRead);
+      socket.off("message_unread_count", handleUnreadCountUpdate);
     };
   }, [socket, user, isOpen]);
 

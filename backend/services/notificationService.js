@@ -519,12 +519,28 @@ class NotificationService {
   }
 
   // Obtenir le nombre de notifications non lues
+  // async getUnreadCount(userId) {
+  //   try {
+  //     return await Notification.count({
+  //       where: {
+  //         userId,
+  //         isRead: false,
+  //       },
+  //     });
+  //   } catch (error) {
+  //     console.error("Erreur comptage notifications:", error);
+  //     return 0;
+  //   }
+  // }
   async getUnreadCount(userId) {
     try {
       return await Notification.count({
         where: {
           userId,
           isRead: false,
+          type: {
+            [Op.ne]: "new_message", // ← EXCLURE les messages
+          },
         },
       });
     } catch (error) {
